@@ -1,14 +1,14 @@
 package com.buvatu.cronjob.management.task;
 
-import java.util.concurrent.Callable;
-
 import org.springframework.stereotype.Component;
 
+import com.buvatu.cronjob.management.model.Task;
+
 @Component
-public class FirstTask implements Callable<String> {
+public class FirstTask implements Task {
 
     @Override
-    public String call() throws Exception {
+    public String getTaskExecutionResult() {
         return null;
     }
 

@@ -49,9 +49,6 @@ public class Cronjob {
         }, new CronTrigger(cronExpression));
     }
 
-    @Autowired
-    private List<Step> stepList;
-
     public void start() {
         String taskExecutionResult = "";
         AtomicReference<String> activityName = new AtomicReference<String>("Start Activity");
