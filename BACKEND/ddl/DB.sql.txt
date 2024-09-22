@@ -1,0 +1,30 @@
+CREATE TABLE public.cronjob_config (
+	id uuid,
+	cronjob_name varchar primary key,
+	cronjob_expression varchar,
+	pool_size int2 default 5,
+	cronjob_status varchar,
+	updated_timestamp timestamp default now(),
+	updated_user varchar
+);
+
+CREATE TABLE public.workflow_log (
+	id serial,
+	session_id uuid,
+	cronjob_name varchar,
+	activity_name varchar,
+	progress_value int2,
+	updated_timestamp timestamp default now(),
+	updated_user varchar default 'SYSTEM'
+);
+
+CREATE TABLE public.cronjob_history (
+	id serial,
+	session_id uuid DEFAULT gen_random_uuid(),
+	cronjob_name varchar,
+	start_at timestamp,
+	stop_at timestamp,
+	operation varchar,
+	executed_by varchar,
+	execute_result varchar
+);
