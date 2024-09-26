@@ -1,12 +1,10 @@
 package com.buvatu.cronjob.management.controller;
 
+import com.buvatu.cronjob.management.model.BusinessException;
 import com.buvatu.cronjob.management.service.CronjobManagementService;
-import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 
-import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -18,19 +16,14 @@ public class CronjobManagementController {
         this.cronjobManagementService = cronjobManagementService;
     }
 
-    @GetMapping(path = "/stream-cronjob-status", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Flux<List<Map<String, Object>>> streamCronjobStatus() {
-        return Flux.interval(Duration.ofSeconds(1)).map(sequence -> cronjobManagementService.getLatestLogList());
-    }
-
     @PostMapping("/cronjob/{cronjobName}/schedule")
-    public void scheduleCronjob(@PathVariable("cronjobName") String cronjobName, @RequestParam  String updatedExpression) {
+    public void schedule(@PathVariable("cronjobName") String cronjobName, @RequestParam String updatedExpression) {
         cronjobManagementService.schedule(cronjobName, updatedExpression);
     }
 
     @PostMapping("/cronjob/{cronjobName}/cancel")
-    public void cancelScheduleCronjob(@PathVariable("cronjobName") String cronjobName) {
-        cronjobManagementService.cancelSchedule(cronjobName);
+    public void cancel(@PathVariable("cronjobName") String cronjobName) {
+        cronjobManagementService.cancel(cronjobName);
     }
 
     @PostMapping("/cronjob/{cronjobName}/start")
@@ -38,9 +31,34 @@ public class CronjobManagementController {
         cronjobManagementService.forceStart(cronjobName);
     }
 
-    @PostMapping("/cronjob/{cronjobName}/stop")
-    public void stopCronjob(@PathVariable("cronjobName") String cronjobName) {
-        cronjobManagementService.forceStop(cronjobName);
+    @PostMapping("/cronjob/{cronjobName}/postpone")
+    public void postpone(@PathVariable("cronjobName") String cronjobName) {
+        cronjobManagementService.postpone(cronjobName);
+    }
+
+    @PostMapping("/cronjob")
+    public void addNewCronjob(@RequestBody Map<String,Object> cronjobConfigMap) {
+        cronjobManagementService.addNewCronjob(cronjobConfigMap);
+    }
+
+    @GetMapping("/cronjob/list")
+    public ResponseEntity<?> getCronjobList() {
+        return ResponseEntity.ok(cronjobManagementService.getCronjobList());
+    }
+
+    @GetMapping("/cronjob/logs")
+    public ResponseEntity<?> getActiveLogs() {
+        return ResponseEntity.ok(cronjobManagementService.getActiveLogs());
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<?> handleBusinessException(BusinessException ex) {
+        return ResponseEntity.status(ex.getCode()).body(ex);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleException(Exception ex) {
+        return ResponseEntity.internalServerError().body(ex);
     }
 
 }

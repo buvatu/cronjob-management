@@ -1,12 +1,19 @@
 package com.buvatu.cronjob.management.model;
 
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.*;
 
 import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.config.CronTask;
+import org.springframework.scheduling.config.ScheduledTask;
+import org.springframework.scheduling.config.Task;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.security.core.Authentication;
@@ -20,68 +27,61 @@ import org.springframework.web.context.request.RequestContextHolder;
 @Getter @Setter
 public class Cronjob {
 
-    private final String cronjobName = this.getClass().getSimpleName();
-
+    private String cronjobName;
     private String expression;
-    private Integer poolSize = 5; // Default poolSize = 5
-    private ThreadPoolTaskScheduler taskScheduler;
-    private ScheduledFuture<?> scheduledFuture;
+    private String cronjobStatus;
+    private ScheduledFuture<?> future;
+    private Integer poolSize = 5; // Default pool_size = 5
+    private Runnable cronjobExecutor;
+    private String taskName;
     private Runnable task;
 
     @Autowired
     private CronjobManagementRepository cronjobManagementRepository; // helper
 
-    public void initializeTaskScheduler() {
-        taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setPoolSize(poolSize);
-        taskScheduler.setThreadNamePrefix(cronjobName);
-        taskScheduler.initialize();
+    @Autowired
+    private ThreadPoolTaskScheduler taskScheduler;
+
+    public void initializeCronjobExecutor() {
+        cronjobExecutor = new Runnable() {
+
+            public void run() {
+                String currentCronjobStatus = getCronjobStatus();
+                setCronjobStatus("RUNNING");
+                Map<String, Object> cronjobHistoryLog = new HashMap<String, Object>();
+                String taskExecutionResult = "SUCCESS";
+                try {
+                    Executors.newFixedThreadPool(poolSize).execute(task);
+                } catch (Exception e) {
+                    taskExecutionResult = "EXCEPTION: " + e.getMessage();
+                }
+                setCronjobStatus(currentCronjobStatus);
+                if ("SCHEDULED".equals(cronjobStatus)) {
+                    schedule(expression);
+                }
+                cronjobManagementRepository.insertCronjobHistoryLog(cronjobHistoryLog);
+            }
+
+        };
     }
 
     public void schedule(String updatedExpression) {
-        if (!StringUtils.hasText(updatedExpression) || !CronExpression.isValidExpression(updatedExpression) || updatedExpression.equalsIgnoreCase(expression)) {
-            return;
-        }
-        if (Objects.isNull(taskScheduler)) initializeTaskScheduler();
-        if (Objects.nonNull(scheduledFuture)) scheduledFuture.cancel(true);
+        if (Objects.nonNull(future)) future.cancel(true);
         expression = updatedExpression;
-        scheduledFuture = taskScheduler.schedule(task, new CronTrigger(expression));
-        cronjobManagementRepository.updateCronjobStatus("SCHEDULED", cronjobName);
+        future = taskScheduler.schedule(cronjobExecutor, new CronTrigger(expression));
+        setCronjobStatus("SCHEDULED");
     }
 
     public void cancel() {
-        if (Objects.nonNull(scheduledFuture)) scheduledFuture.cancel(true);
-        taskScheduler.destroy();
-        scheduledFuture = null;
-        taskScheduler = null;
-        cronjobManagementRepository.updateCronjobStatus("CANCELLED", cronjobName);
+        if (Objects.nonNull(future)) future.cancel(true);
     }
 
-    public void start() {
-        if (Objects.isNull(taskScheduler)) initializeTaskScheduler();
-        taskScheduler.execute(task);
+    public void forceStart() {
+        future = taskScheduler.schedule(cronjobExecutor, Timestamp.valueOf(LocalDateTime.now().plusSeconds(1)));// delay 1s to run
     }
 
-    public void stop() {
-        destroyCronjob();
-        cronjobManagementRepository.updateCronjobStatus("STOPPED", cronjobName);
-    }
-
-    public void loadConfig() {
-        Map<String, Object> cronjobConfigMap = cronjobManagementRepository.getCronjobConfig(cronjobName);
-        setExpression((String) cronjobConfigMap.get("cronjob_expression"));
-        setPoolSize((Integer) cronjobConfigMap.get("pool_size"));
-    }
-
-    private String getCurrentLoggedInUsername() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return Objects.nonNull(auth) ? auth.getName() : "SYSTEM";
-    }
-
-    private void destroyCronjob() {
-        if (Objects.nonNull(scheduledFuture)) scheduledFuture.cancel(true);
-        taskScheduler.destroy();
-        scheduledFuture = null;
-        taskScheduler = null;
+    public void setCronjobStatus(String cronjobStatus) {
+        this.cronjobStatus = cronjobStatus;
+        cronjobManagementRepository.updateCronjobStatus(cronjobStatus, cronjobName);
     }
 }

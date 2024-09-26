@@ -103,5 +103,21 @@ public class CronjobManagementRepository {
         }
     }
 
+    public List<Map<String, Object>> getActiveLogs() {
+        try {
+            Stream<?> queryStream = em.createNativeQuery("select j.cronjob_name, l.activity_name, l.progress_value, j.cronjob_status from cronjob j join workflow_log l on l.cronjob_name = j.cronjob_name order by l.id desc limit 1").getResultStream();
+            return queryStream.map(record -> {
+                Object[] workflowValues = (Object[]) record;
+                Map<String, Object> workflowLogMap = new HashMap<>();
+                workflowLogMap.put("cronjob_name", workflowValues[1]);
+                workflowLogMap.put("activity_name", workflowValues[2]);
+                workflowLogMap.put("progress_value", workflowValues[3]);
+                workflowLogMap.put("cronjob_status", workflowValues[4]);
+                return workflowLogMap;
+            }).collect(Collectors.toList());
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
 }
