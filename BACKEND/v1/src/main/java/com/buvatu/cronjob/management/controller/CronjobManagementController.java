@@ -17,18 +17,8 @@ public class CronjobManagementController {
     }
 
     @PostMapping("/cronjob/{cronjobName}/schedule")
-    public void schedule(@PathVariable("cronjobName") String cronjobName, @RequestParam String updatedExpression) {
+    public void schedule(@PathVariable("cronjobName") String cronjobName, @RequestParam(required = false, defaultValue = "") String updatedExpression) {
         cronjobManagementService.schedule(cronjobName, updatedExpression);
-    }
-
-    @PostMapping("/cronjob/{cronjobName}/cancel")
-    public void cancel(@PathVariable("cronjobName") String cronjobName) {
-        cronjobManagementService.cancel(cronjobName);
-    }
-
-    @PostMapping("/cronjob/{cronjobName}/start")
-    public void startCronjobManually(@PathVariable("cronjobName") String cronjobName) {
-        cronjobManagementService.forceStart(cronjobName);
     }
 
     @PostMapping("/cronjob/{cronjobName}/postpone")
@@ -36,9 +26,19 @@ public class CronjobManagementController {
         cronjobManagementService.postpone(cronjobName);
     }
 
-    @PostMapping("/cronjob")
-    public void addNewCronjob(@RequestBody Map<String,Object> cronjobConfigMap) {
-        cronjobManagementService.addNewCronjob(cronjobConfigMap);
+    @PostMapping("/cronjob/{cronjobName}/start")
+    public void startCronjobManually(@PathVariable("cronjobName") String cronjobName) {
+        cronjobManagementService.forceStart(cronjobName);
+    }
+
+    @PostMapping("/cronjob/{cronjobName}/cancel")
+    public void cancel(@PathVariable("cronjobName") String cronjobName) {
+        cronjobManagementService.cancel(cronjobName);
+    }
+
+    @PostMapping("/cronjob/{cronjobName}/poolSize")
+    public void updatePoolSize(@PathVariable("cronjobName") String cronjobName, @RequestParam Integer poolSize) {
+        cronjobManagementService.updatePoolSize(cronjobName, poolSize);
     }
 
     @GetMapping("/cronjob/list")
