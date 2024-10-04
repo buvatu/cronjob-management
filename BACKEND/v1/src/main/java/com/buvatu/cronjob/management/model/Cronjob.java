@@ -9,8 +9,8 @@ import java.util.UUID;
 import java.util.concurrent.*;
 
 import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.lang.Nullable;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 
@@ -26,10 +26,11 @@ public class Cronjob {
     private String expression;
     private String cronjobStatus;
     private ThreadPoolTaskScheduler taskScheduler;
-    private ScheduledFuture<?> future;
+    private ScheduledFuture<?> scheduledFuture;
     private Integer poolSize = 5; // Default pool_size = 5
     private Runnable cronjobExecutor;
     private Runnable task;
+    private ExecutorService executor;
 
     private final CronjobManagementRepository cronjobManagementRepository; // helper
 
@@ -47,17 +48,18 @@ public class Cronjob {
             setCronjobStatus("RUNNING");
             setSessionId(UUID.randomUUID().toString());
             Map<String, Object> cronjobHistoryLog = new HashMap<>();
-            cronjobHistoryLog.put("cronjobName", cronjobName);
+            cronjobHistoryLog.put("cronjobName", getCronjobName());
             cronjobHistoryLog.put("sessionId", getSessionId());
-            cronjobHistoryLog.put("startTime", LocalDateTime.now());
+            cronjobHistoryLog.put("beginTime", LocalDateTime.now());
             try {
-                Executors.newFixedThreadPool(poolSize).execute(task);
+                Executors.newFixedThreadPool(getPoolSize()).submit(getTask()).get();
                 cronjobHistoryLog.put("executeResult", "SUCCESS");
             } catch (Exception e) {
                 cronjobHistoryLog.put("executeResult", "EXCEPTION: " + e.getMessage());
+                setCronjobStatus(currentCronjobStatus);
             }
             cronjobHistoryLog.put("endTime", LocalDateTime.now());
-            Map<String, Object> cronjobHistoryLogMap = cronjobManagementRepository.getLatestCronjobHistoryLog(cronjobName);
+            Map<String, Object> cronjobHistoryLogMap = cronjobManagementRepository.getLatestCronjobHistoryLog(getCronjobName());
             if ("START JOB MANUALLY".equals(cronjobHistoryLogMap.get("operation")) && Objects.isNull(cronjobHistoryLogMap.get("executeResult"))) { // Start job manually case
                 cronjobHistoryLog.put("id", cronjobHistoryLogMap.get("id"));
                 cronjobManagementRepository.updateCronjobHistoryLog(cronjobHistoryLog);
@@ -67,35 +69,31 @@ public class Cronjob {
                 cronjobManagementRepository.insertCronjobHistoryLog(cronjobHistoryLog);
             }
             setCronjobStatus(currentCronjobStatus);
-            if ("SCHEDULED".equals(cronjobStatus)) { // Re-schedule with existed expression
-                future = taskScheduler.schedule(cronjobExecutor, new CronTrigger(expression));
-            }
         };
     }
 
     public void schedule(String updatedExpression) {
         if (StringUtils.hasText(updatedExpression) && !updatedExpression.equals(expression)) setExpression(updatedExpression);
-        future = taskScheduler.schedule(cronjobExecutor, new CronTrigger(expression));
+        scheduledFuture = taskScheduler.schedule(cronjobExecutor, new CronTrigger(expression));
         setCronjobStatus("SCHEDULED");
     }
 
-    public void cancel() {
-        if (Objects.nonNull(future)) future.cancel(true);
+    public void cancel() { // How to kill my task?
     }
 
     public void forceStart() {
-        future = taskScheduler.schedule(cronjobExecutor, Timestamp.valueOf(LocalDateTime.now().plusSeconds(1)));// delay 1s to run
+        taskScheduler.execute(cronjobExecutor);
     }
 
     public void setCronjobStatus(String cronjobStatus) {
         this.cronjobStatus = cronjobStatus;
-        cronjobManagementRepository.updateCronjobStatus(cronjobStatus, cronjobName);
+        cronjobManagementRepository.updateCronjobStatus(cronjobStatus, getCronjobName());
     }
 
     public String getCronjobStatus() {
         // Use for multiple instances
         String currentCronjobStatus = cronjobManagementRepository.getCronjobStatus(cronjobName);
-        if (!cronjobStatus.equals(currentCronjobStatus)) setCronjobStatus(currentCronjobStatus);
+        if (!currentCronjobStatus.equals(cronjobStatus)) setCronjobStatus(currentCronjobStatus);
         return cronjobStatus;
     }
 

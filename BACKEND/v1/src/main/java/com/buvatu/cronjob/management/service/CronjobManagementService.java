@@ -6,7 +6,6 @@ import java.util.*;
 import com.buvatu.cronjob.management.model.BusinessException;
 import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
 
-import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.lang.Nullable;
@@ -44,7 +43,7 @@ public class CronjobManagementService {
         Cronjob cronjob = getCronjob(cronjobName);
         if (Objects.isNull(cronjob)) throw new BusinessException(404, String.format("Cronjob %s is not found", cronjobName));
         if ("RUNNING".equals(cronjob.getCronjobStatus())) throw new BusinessException(400, "Cronjob is running");
-        cronjob.setFuture(null);
+        cronjob.setScheduledFuture(null);
         cronjob.setCronjobStatus("UNSCHEDULED");
         cronjobManagementRepository.insertCronjobHistoryLog(getCronjobHistoryLog(cronjobName, "POSTPONE JOB"));
     }
@@ -63,17 +62,17 @@ public class CronjobManagementService {
         if ("RUNNING".equals(cronjob.getCronjobStatus())) throw new BusinessException(400, String.format("Cronjob %s is running", cronjobName));
         Map<String, Object> cronjobHistoryLog = new HashMap<>();
         cronjobHistoryLog.put("cronjobName", cronjobName);
-        cronjobHistoryLog.put("startTime", LocalDateTime.now());
-        cronjobHistoryLog.put("executedBy", getExecutor());
+        cronjobHistoryLog.put("beginTime", LocalDateTime.now());
         cronjobHistoryLog.put("operation", "START JOB MANUALLY");
-        cronjobManagementRepository.insertCronjobHistoryLog(cronjobHistoryLog);
+        cronjobHistoryLog.put("executedBy", getExecutor());
+        cronjobManagementRepository.insertPartOfCronjobHistoryLog(cronjobHistoryLog);
         cronjob.forceStart();
     }
 
     public void updatePoolSize(String cronjobName, Integer poolSize) {
         Cronjob cronjob = getCronjob(cronjobName);
         if (Objects.isNull(cronjob)) throw new BusinessException(404, String.format("Cronjob %s is not found", cronjobName));
-        if (Objects.isNull(poolSize) || poolSize < 1 || poolSize == cronjob.getPoolSize()) throw new BusinessException(400, "Pool size is not valid");
+        if (Objects.isNull(poolSize) || poolSize < 1 || poolSize.equals(cronjob.getPoolSize())) throw new BusinessException(400, "Pool size is not valid");
         if ("RUNNING".equals(cronjob.getCronjobStatus())) throw new BusinessException(400, String.format("Cronjob %s is running", cronjobName));
         cronjob.setPoolSize(poolSize);
         cronjob.initializeCronjobExecutor();
@@ -89,8 +88,9 @@ public class CronjobManagementService {
         Map<String, Object> cronjobHistoryLog = new HashMap<>();
         cronjobHistoryLog.put("cronjobName", cronjobName);
         cronjobHistoryLog.put("sessionId", UUID.randomUUID().toString());
-        cronjobHistoryLog.put("startTime", LocalDateTime.now());
+        cronjobHistoryLog.put("beginTime", LocalDateTime.now());
         cronjobHistoryLog.put("endTime", LocalDateTime.now());
+        cronjobHistoryLog.put("operation", operation);
         cronjobHistoryLog.put("executedBy", getExecutor());
         cronjobHistoryLog.put("executeResult", "SUCCESS");
         return cronjobHistoryLog;
@@ -113,7 +113,11 @@ public class CronjobManagementService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        cronjobList.stream().forEach(e -> e.schedule("*/10 * * * * *"));
+        cronjobList.stream().forEach(e -> {
+            Map<String, Object> cronjobConfigMap = cronjobManagementRepository.getCronjobConfig(e.getCronjobName());
+            e.setPoolSize((Integer) cronjobConfigMap.get("poolSize"));
+            e.setExpression((String) cronjobConfigMap.get("expression"));
+            e.setCronjobStatus("UNSCHEDULED");
+        });
     }
-
 }

@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 @Component
 public class DemoJob extends Cronjob {
@@ -21,12 +22,14 @@ public class DemoJob extends Cronjob {
     private void runActivity1() {
         getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity1", 0);
         Arrays.asList("Reflection", "Collection", "Stream").stream().forEach(e -> System.out.println(e));
+        IntStream.range(0, Integer.MAX_VALUE).parallel().forEach(e -> System.out.println(e));
         getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity1", 50);
     }
 
     private void runActivity2() {
         getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity2", 50);
         Arrays.asList("Sorting", "Mapping", "Reduction", "Stream").stream().forEach(e -> System.out.println(e));
+        // IntStream.range(0, Integer.MAX_VALUE).parallel().forEach(e -> System.out.println(e));
         getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity2", 100);
     }
 
