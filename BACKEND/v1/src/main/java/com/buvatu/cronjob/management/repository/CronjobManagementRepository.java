@@ -26,6 +26,7 @@ public class CronjobManagementRepository {
         try {
             return getCronjobConfigMap(em.createNativeQuery("select cast(id as varchar), cronjob_name, pool_size, cronjob_expression, cronjob_status from workflow_config where cronjob_name = :cronjobName").setParameter("cronjobName", cronjobName).getSingleResult());
         } catch (Exception e) {
+            log.error("getCronjobConfig: " + e.getMessage());
             return null;
         }
     }
@@ -35,6 +36,7 @@ public class CronjobManagementRepository {
             Stream<?> queryStream = em.createNativeQuery("select cast(id as varchar), cronjob_name, pool_size, cronjob_expression, cronjob_status from workflow_config").getResultStream();
             return queryStream.map(record -> getCronjobConfigMap(record)).collect(Collectors.toList());
         } catch (Exception e) {
+            log.error("getCronjobConfigList: " + e.getMessage());
             return null;
         }
     }
@@ -56,6 +58,7 @@ public class CronjobManagementRepository {
             em.createNativeQuery("update workflow_config set cronjob_status = :status where cronjob_name = :cronjobName").setParameter("status", status).setParameter("cronjobName", cronjobName).executeUpdate();
             em.flush();
         } catch (Exception e) {
+            log.error("updateCronjobStatus: " + e.getMessage());
             throw new BusinessException(500, "Failed to execute update table workflow_config");
         }
     }
@@ -66,6 +69,7 @@ public class CronjobManagementRepository {
             em.createNativeQuery("update workflow_config set cronjob_expression = :expression where cronjob_name = :cronjobName").setParameter("expression", expression).setParameter("cronjobName", cronjobName).executeUpdate();
             em.flush();
         } catch (Exception e) {
+            log.error("updateCronjobExpression: " + e.getMessage());
             throw new BusinessException(500, "Failed to execute update table workflow_config");
         }
     }
@@ -76,6 +80,7 @@ public class CronjobManagementRepository {
             em.createNativeQuery("update workflow_config set current_session_id = uuid(:sessionId) where cronjob_name = :cronjobName").setParameter("sessionId", sessionId).setParameter("cronjobName", cronjobName).executeUpdate();
             em.flush();
         } catch (Exception e) {
+            log.error("updateCronjobSessionId: " + e.getMessage());
             throw new BusinessException(500, "Failed to execute update table workflow_config");
         }
     }
@@ -86,6 +91,7 @@ public class CronjobManagementRepository {
             em.createNativeQuery("update workflow_config set pool_size = :poolSize where cronjob_name = :cronjobName").setParameter("poolSize", poolSize).setParameter("cronjobName", cronjobName).executeUpdate();
             em.flush();
         } catch (Exception e) {
+            log.error("updateCronjobPoolSize: " + e.getMessage());
             throw new BusinessException(500, "Failed to execute update table workflow_config");
         }
     }
@@ -94,6 +100,7 @@ public class CronjobManagementRepository {
         try {
             return (String) em.createNativeQuery("select cronjob_status from workflow_config where cronjob_name = :cronjobName").setParameter("cronjobName", cronjobName).getSingleResult();
         } catch (Exception e) {
+            log.error("getCronjobStatus: " + e.getMessage());
             throw new BusinessException(500, "Failed to execute query");
         }
     }
@@ -101,7 +108,7 @@ public class CronjobManagementRepository {
     @Transactional
     public void insertTracingLog(String cronjobName, String sessionId, String activityName, Integer progressValue) {
         try {
-            em.createNativeQuery("insert into workflow_log(cronjob_name, session_id, activity_name, progress_value) values (:cronjobName, uuid(:sessionId),:activityName, :progressValue)")
+            em.createNativeQuery("insert into workflow_log(cronjob_name, session_id, activity_name, progress_value) values (:cronjobName, :sessionId,:activityName, :progressValue)")
                     .setParameter("cronjobName", cronjobName)
                     .setParameter("sessionId", sessionId)
                     .setParameter("activityName", activityName)
@@ -109,7 +116,7 @@ public class CronjobManagementRepository {
               .executeUpdate();
             em.flush();
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("insertTracingLog: " + e.getMessage());
             throw new BusinessException(500, "Failed to insert tracing log to workflow_log table");
         }
     }
@@ -124,7 +131,7 @@ public class CronjobManagementRepository {
             cronjobHistoryLogMap.put("executeResult", latestCronjobHistoryLog[2]);
             return cronjobHistoryLogMap;
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("getLatestCronjobHistoryLog: " + e.getMessage());
             throw new BusinessException(500, "Failed to get log from workflow_change_history");
         }
     }
@@ -132,14 +139,14 @@ public class CronjobManagementRepository {
     @Transactional
     public void insertCronjobHistoryLog(Map<String, Object> paramMap) {
         try {
-            Query query = em.createNativeQuery("insert into workflow_change_history(cronjob_name, session_id, start_at, stop_at, operation, executed_by, execute_result) values (:cronjobName, uuid(:sessionId), :beginTime, :endTime, :operation, :executedBy, :executeResult)");
+            Query query = em.createNativeQuery("insert into workflow_change_history(cronjob_name, session_id, start_at, stop_at, operation, executed_by, execute_result) values (:cronjobName, :sessionId, :beginTime, :endTime, :operation, :executedBy, :executeResult)");
             for (Map.Entry<String, Object> entry : paramMap.entrySet()) {
                 query.setParameter(entry.getKey(), entry.getValue());
             }
             query.executeUpdate();
             em.flush();
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("insertCronjobHistoryLog: " + e.getMessage());
         }
     }
 
@@ -153,21 +160,22 @@ public class CronjobManagementRepository {
             query.executeUpdate();
             em.flush();
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("insertPartOfCronjobHistoryLog: " + e.getMessage());
         }
     }
 
     @Transactional
     public void updateCronjobHistoryLog(Map<String, Object> paramMap) {
         try {
-            Query query = em.createNativeQuery("update workflow_change_history set session_id = uuid(:sessionId), stop_at = :endTime, execute_result = :executeResult where id = :id");
-            for (Map.Entry<String, Object> entry : paramMap.entrySet()) {
-                query.setParameter(entry.getKey(), entry.getValue());
-            }
+            Query query = em.createNativeQuery("update workflow_change_history set session_id = :sessionId, stop_at = :endTime, execute_result = :executeResult where id = :id");
+            query.setParameter("sessionId", paramMap.get("sessionId"));
+            query.setParameter("endTime", paramMap.get("endTime"));
+            query.setParameter("executeResult", paramMap.get("executeResult"));
+            query.setParameter("id", paramMap.get("id"));
             query.executeUpdate();
             em.flush();
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("updateCronjobHistoryLog: " + e.getMessage());
         }
     }
 
@@ -184,6 +192,7 @@ public class CronjobManagementRepository {
                 return workflowLogMap;
             }).collect(Collectors.toList());
         } catch (Exception e) {
+            log.error("getLatestLogList: " + e.getMessage());
             return null;
         }
     }
@@ -201,6 +210,7 @@ public class CronjobManagementRepository {
                 return workflowLogMap;
             }).collect(Collectors.toList());
         } catch (Exception e) {
+            log.error("getActiveLogs: " + e.getMessage());
             return null;
         }
     }

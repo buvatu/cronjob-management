@@ -41,15 +41,15 @@ public class CronjobManagementController {
         cronjobManagementService.updatePoolSize(cronjobName, poolSize);
     }
 
-    @GetMapping("/cronjob/list")
-    public ResponseEntity<?> getCronjobList() {
-        return ResponseEntity.ok(cronjobManagementService.getCronjobList());
-    }
+//    @GetMapping("/cronjob/list")
+//    public ResponseEntity<?> getCronjobList() {
+//        return ResponseEntity.ok(cronjobManagementService.getCronjobList());
+//    }
 
-    @GetMapping("/cronjob/logs")
-    public ResponseEntity<?> getActiveLogs() {
-        return ResponseEntity.ok(cronjobManagementService.getActiveLogs());
-    }
+//    @GetMapping("/cronjob/logs")
+//    public ResponseEntity<?> getActiveLogs() {
+//        return ResponseEntity.ok(cronjobManagementService.getActiveLogs());
+//    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<?> handleBusinessException(BusinessException ex) {

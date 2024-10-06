@@ -10,9 +10,9 @@ CREATE TABLE public.workflow_config (
 );
 
 CREATE TABLE public.workflow_log (
-	id serial,
+	id serial primary key,
 	cronjob_name varchar,
-	session_id uuid,
+	session_id varchar,
 	activity_name varchar,
 	progress_value int2,
 	updated_timestamp timestamp default now(),
@@ -20,9 +20,9 @@ CREATE TABLE public.workflow_log (
 );
 
 CREATE TABLE public.workflow_change_history (
-	id serial,
+	id serial primary key,
 	cronjob_name varchar,
-	session_id uuid,
+	session_id varchar,
 	start_at timestamp,
 	stop_at timestamp,
 	executed_by varchar,

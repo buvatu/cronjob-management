@@ -1,6 +1,5 @@
 package com.buvatu.cronjob.management.model;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -9,14 +8,14 @@ import java.util.UUID;
 import java.util.concurrent.*;
 
 import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.util.StringUtils;
+
+import javax.annotation.PostConstruct;
 
 @Getter @Setter
 public class Cronjob {
@@ -26,20 +25,35 @@ public class Cronjob {
     private String expression;
     private String cronjobStatus;
     private ThreadPoolTaskScheduler taskScheduler;
-    private ScheduledFuture<?> scheduledFuture;
     private Integer poolSize = 5; // Default pool_size = 5
     private Runnable cronjobExecutor;
     private Runnable task;
-    private ExecutorService executor;
+    private Future<?> future;
 
     private final CronjobManagementRepository cronjobManagementRepository; // helper
 
     public Cronjob(CronjobManagementRepository cronjobManagementRepository) {
         this.cronjobManagementRepository = cronjobManagementRepository;
+    }
+
+    @PostConstruct
+    private void initialize() {
+        initializeTaskScheduler();
+        loadConfig();
+        initializeCronjobExecutor();
+    }
+
+    private void initializeTaskScheduler() {
         taskScheduler = new ThreadPoolTaskScheduler();
         taskScheduler.setThreadNamePrefix("cronjob-" + cronjobName + "-");
         taskScheduler.initialize();
-        initializeCronjobExecutor();
+    }
+
+    private void loadConfig() {
+        Map<String, Object> cronjobConfigMap = cronjobManagementRepository.getCronjobConfig(getCronjobName());
+        poolSize = (Integer) cronjobConfigMap.get("poolSize");
+        expression = (String) cronjobConfigMap.get("expression");
+        setCronjobStatus("UNSCHEDULED");
     }
 
     public void initializeCronjobExecutor() {
@@ -52,7 +66,7 @@ public class Cronjob {
             cronjobHistoryLog.put("sessionId", getSessionId());
             cronjobHistoryLog.put("beginTime", LocalDateTime.now());
             try {
-                Executors.newFixedThreadPool(getPoolSize()).submit(getTask()).get();
+                future = Executors.newFixedThreadPool(getPoolSize()).submit(task);
                 cronjobHistoryLog.put("executeResult", "SUCCESS");
             } catch (Exception e) {
                 cronjobHistoryLog.put("executeResult", "EXCEPTION: " + e.getMessage());
@@ -74,15 +88,17 @@ public class Cronjob {
 
     public void schedule(String updatedExpression) {
         if (StringUtils.hasText(updatedExpression) && !updatedExpression.equals(expression)) setExpression(updatedExpression);
-        scheduledFuture = taskScheduler.schedule(cronjobExecutor, new CronTrigger(expression));
+        taskScheduler.schedule(cronjobExecutor, new CronTrigger(expression));
         setCronjobStatus("SCHEDULED");
     }
 
     public void cancel() { // How to kill my task?
+        future.cancel(true);
     }
 
     public void forceStart() {
-        taskScheduler.execute(cronjobExecutor);
+        future = Executors.newFixedThreadPool(getPoolSize()).submit(task);
+        // taskScheduler.execute(cronjobExecutor);
     }
 
     public void setCronjobStatus(String cronjobStatus) {
@@ -111,4 +127,5 @@ public class Cronjob {
         this.sessionId = sessionId;
         cronjobManagementRepository.updateCronjobSessionId(sessionId, cronjobName);
     }
+
 }

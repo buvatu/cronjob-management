@@ -29,7 +29,7 @@ public class DemoJob extends Cronjob {
     private void runActivity2() {
         getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity2", 50);
         Arrays.asList("Sorting", "Mapping", "Reduction", "Stream").stream().forEach(e -> System.out.println(e));
-        // IntStream.range(0, Integer.MAX_VALUE).parallel().forEach(e -> System.out.println(e));
+        IntStream.range(0, Integer.MAX_VALUE).parallel().forEach(e -> System.out.println(e));
         getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity2", 100);
     }
 

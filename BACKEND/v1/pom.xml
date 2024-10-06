@@ -14,7 +14,7 @@
     <name>cronjob-management-service-v1</name>
     <description>Cron Job Management Service - v1</description>
     <properties>
-        <java.version>11</java.version>
+        <java.version>19</java.version>
     </properties>
     <dependencies>
         <dependency>
@@ -49,6 +49,14 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>19</source>
+                    <target>19</target>
                 </configuration>
             </plugin>
         </plugins>

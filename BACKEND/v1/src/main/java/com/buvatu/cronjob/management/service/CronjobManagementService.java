@@ -43,7 +43,6 @@ public class CronjobManagementService {
         Cronjob cronjob = getCronjob(cronjobName);
         if (Objects.isNull(cronjob)) throw new BusinessException(404, String.format("Cronjob %s is not found", cronjobName));
         if ("RUNNING".equals(cronjob.getCronjobStatus())) throw new BusinessException(400, "Cronjob is running");
-        cronjob.setScheduledFuture(null);
         cronjob.setCronjobStatus("UNSCHEDULED");
         cronjobManagementRepository.insertCronjobHistoryLog(getCronjobHistoryLog(cronjobName, "POSTPONE JOB"));
     }
@@ -51,7 +50,7 @@ public class CronjobManagementService {
     public void cancel(String cronjobName) {
         Cronjob cronjob = getCronjob(cronjobName);
         if (Objects.isNull(cronjob)) throw new BusinessException(404, String.format("Cronjob %s is not found", cronjobName));
-        if (!"RUNNING".equals(cronjob.getCronjobStatus())) throw new BusinessException(400, String.format("Cronjob %s is not running", cronjobName));
+        // if (!"RUNNING".equals(cronjob.getCronjobStatus())) throw new BusinessException(400, String.format("Cronjob %s is not running", cronjobName));
         cronjob.cancel();
         cronjobManagementRepository.insertCronjobHistoryLog(getCronjobHistoryLog(cronjobName, "CANCEL JOB"));
     }
@@ -103,21 +102,4 @@ public class CronjobManagementService {
         return StringUtils.hasText(executor) ? executor : "SYSTEM";
     }
 
-    public List<Map<String, Object>> getCronjobList() {
-        return cronjobManagementRepository.getCronjobConfigList();
-    }
-
-    public List<Map<String, Object>> getActiveLogs() {
-        return cronjobManagementRepository.getActiveLogs();
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void onApplicationReady() {
-        cronjobList.stream().forEach(e -> {
-            Map<String, Object> cronjobConfigMap = cronjobManagementRepository.getCronjobConfig(e.getCronjobName());
-            e.setPoolSize((Integer) cronjobConfigMap.get("poolSize"));
-            e.setExpression((String) cronjobConfigMap.get("expression"));
-            e.setCronjobStatus("UNSCHEDULED");
-        });
-    }
 }
