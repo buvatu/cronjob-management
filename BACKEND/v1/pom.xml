@@ -14,7 +14,7 @@
     <name>cronjob-management-service-v1</name>
     <description>Cron Job Management Service - v1</description>
     <properties>
-        <java.version>19</java.version>
+        <java.version>11</java.version>
     </properties>
     <dependencies>
         <dependency>

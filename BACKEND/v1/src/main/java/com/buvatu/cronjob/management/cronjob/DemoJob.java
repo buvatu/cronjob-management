@@ -1,17 +1,14 @@
 package com.buvatu.cronjob.management.cronjob;
 
 import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import com.buvatu.cronjob.management.model.Cronjob;
 
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.stream.IntStream;
 
-@Component
+@Component @Slf4j
 public class DemoJob extends Cronjob {
 
     public DemoJob(CronjobManagementRepository cronjobManagementRepository) {
@@ -19,22 +16,18 @@ public class DemoJob extends Cronjob {
         setTask(this::run);
     }
 
-    private void runActivity1() {
+    private void runActivity() {
         getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity1", 0);
-        Arrays.asList("Reflection", "Collection", "Stream").stream().forEach(e -> System.out.println(e));
-        IntStream.range(0, Integer.MAX_VALUE).parallel().forEach(e -> System.out.println(e));
-        getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity1", 50);
-    }
-
-    private void runActivity2() {
-        getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity2", 50);
-        Arrays.asList("Sorting", "Mapping", "Reduction", "Stream").stream().forEach(e -> System.out.println(e));
-        IntStream.range(0, Integer.MAX_VALUE).parallel().forEach(e -> System.out.println(e));
-        getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity2", 100);
+        for (int i = 0; i < Integer.MAX_VALUE; i++) {
+            if (isInterrupted()) {
+                return;
+            }
+            System.out.println(i);
+        }
+        getCronjobManagementRepository().insertTracingLog(getCronjobName(), getSessionId(), "Activity1", 100);
     }
 
     private void run() {
-        runActivity1();
-        runActivity2();
+        runActivity();
     }
 }

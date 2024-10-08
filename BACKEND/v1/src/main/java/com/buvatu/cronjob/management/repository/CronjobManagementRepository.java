@@ -12,9 +12,7 @@ import javax.transaction.Transactional;
 
 import com.buvatu.cronjob.management.model.BusinessException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
-import org.springframework.util.StringUtils;
 
 @Repository @Slf4j
 public class CronjobManagementRepository {
@@ -147,35 +145,6 @@ public class CronjobManagementRepository {
             em.flush();
         } catch (Exception e) {
             log.error("insertCronjobHistoryLog: " + e.getMessage());
-        }
-    }
-
-    @Transactional
-    public void insertPartOfCronjobHistoryLog(Map<String, Object> paramMap) {
-        try {
-            Query query = em.createNativeQuery("insert into workflow_change_history(cronjob_name, start_at, operation, executed_by) values (:cronjobName, :beginTime, :operation, :executedBy)");
-            for (Map.Entry<String, Object> entry : paramMap.entrySet()) {
-                query.setParameter(entry.getKey(), entry.getValue());
-            }
-            query.executeUpdate();
-            em.flush();
-        } catch (Exception e) {
-            log.error("insertPartOfCronjobHistoryLog: " + e.getMessage());
-        }
-    }
-
-    @Transactional
-    public void updateCronjobHistoryLog(Map<String, Object> paramMap) {
-        try {
-            Query query = em.createNativeQuery("update workflow_change_history set session_id = :sessionId, stop_at = :endTime, execute_result = :executeResult where id = :id");
-            query.setParameter("sessionId", paramMap.get("sessionId"));
-            query.setParameter("endTime", paramMap.get("endTime"));
-            query.setParameter("executeResult", paramMap.get("executeResult"));
-            query.setParameter("id", paramMap.get("id"));
-            query.executeUpdate();
-            em.flush();
-        } catch (Exception e) {
-            log.error("updateCronjobHistoryLog: " + e.getMessage());
         }
     }
 
