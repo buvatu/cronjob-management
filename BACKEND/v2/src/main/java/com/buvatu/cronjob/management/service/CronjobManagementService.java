@@ -1,70 +1,72 @@
 package com.buvatu.cronjob.management.service;
 
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.scheduling.support.CronTrigger;
-import org.springframework.stereotype.Service;
+import java.util.*;
 
 import com.buvatu.cronjob.management.model.Activity;
+import com.buvatu.cronjob.management.model.BusinessException;
+
+import com.buvatu.cronjob.management.model.CronjobStatus;
+import org.springframework.scheduling.support.CronExpression;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
 import com.buvatu.cronjob.management.model.Cronjob;
-import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
 
 @Service
 public class CronjobManagementService {
 
-    private final CronjobManagementRepository cronJobManagementRepository;
+    private final List<Cronjob> cronjobList;
 
-    public CronjobManagementService(CronjobManagementRepository cronJobManagementRepository) {
-        this.cronJobManagementRepository = cronJobManagementRepository;
+    public CronjobManagementService(List<Cronjob> cronjobList) {
+        this.cronjobList = cronjobList;
     }
 
-    public void schedule(Cronjob cronjob) {
-        ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setThreadGroupName(cronjob.getJobName());
-        taskScheduler.initialize();
-        taskScheduler.schedule(new Runnable() {
+    public final List<Activity> activityList;
 
-            @Override
-            public void run() {
-                executeJob(cronjob);
-            }
-
-        }, new CronTrigger(cronjob.getCronExpression()));
+    public void schedule(String cronjobName, String updatedExpression) {
+        if (StringUtils.hasText(updatedExpression) && !CronExpression.isValidExpression(updatedExpression)) throw new BusinessException(400, "Expression is not valid");
+        Cronjob cronjob = getCronjob(cronjobName);
+        if (!StringUtils.hasText(cronjob.getExpression()) && !StringUtils.hasText(updatedExpression)) throw new BusinessException(400, "Expression is not valid");
+        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format("Cronjob %s is running", cronjobName));
+        cronjob.schedule(updatedExpression);
     }
 
-    public void executeJob(Cronjob cronjob) {
-        
+    public void cancel(String cronjobName) {
+        Cronjob cronjob = getCronjob(cronjobName);
+        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format("Cronjob %s is running", cronjobName));
+        if (CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format("Cronjob %s is already unscheduled", cronjobName));
+        cronjob.cancel();
     }
 
-    public String getActivityExecutionResult(Activity activity) throws InterruptedException, ExecutionException {
-        ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-        taskExecutor.setCorePoolSize(activity.getCorePoolSize());
-        taskExecutor.setMaxPoolSize(activity.getMaxPoolSize());
-        taskExecutor.setThreadGroupName(activity.getJobName());
-        taskExecutor.setThreadNamePrefix(activity.getJobName() + "-" + activity.getActivityName());
-        taskExecutor.initialize();
-        return taskExecutor.submit(new Callable<String>() {
-
-            @Override
-            public String call() throws Exception {
-                return activity.getTask().getTaskExecutionResult();
-            }
-
-        }).get();
+    public void forceStart(String cronjobName) {
+        Cronjob cronjob = getCronjob(cronjobName);
+        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format("Cronjob %s is running", cronjobName));
+        cronjob.forceStart();
     }
 
-    public void stopRunningActivity(Activity activity) {
-        Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
-        for (Thread runningThread : threadSet) {
-            if (runningThread.getName().startsWith(activity.getJobName() + "-" + activity.getActivityName())) {
-                runningThread.interrupt();
-            }
-        }
+    public void forceStop(String cronjobName) {
+        Cronjob cronjob = getCronjob(cronjobName);
+        if (!CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format("Cronjob %s is not running", cronjobName));
+        cronjob.forceStop();
     }
 
-    
+    public void updatePoolSize(String cronjobName, String activityName, Integer poolSize) {
+        Cronjob cronjob = getCronjob(cronjobName);
+        if (Objects.isNull(poolSize) || poolSize < 1 || poolSize.equals(cronjob.getPoolSize())) throw new BusinessException(400, "Pool size is not valid");
+        if (!CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format("Cronjob %s must be unscheduled", cronjobName));
+        cronjob.setPoolSize(poolSize);
+    }
+
+    private Cronjob getCronjob(String cronjobName) {
+        if (!StringUtils.hasText(cronjobName)) throw new BusinessException(404, String.format("Cronjob %s is not found", cronjobName));
+        Cronjob cronjob = cronjobList.stream().filter(e -> e.getCronjobName().equals(cronjobName)).findFirst().orElse(null);
+        if (Objects.isNull(cronjob)) throw new BusinessException(404, String.format("Cronjob %s is not found", cronjobName));
+        return cronjob;
+    }
+
+    private void execute(String cronjobName, String activityName) {
+
+    }
+
+
 }

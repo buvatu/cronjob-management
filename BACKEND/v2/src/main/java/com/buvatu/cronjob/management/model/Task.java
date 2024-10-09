@@ -10,11 +10,4 @@ public interface Task {
 
     public abstract String getTaskExecutionResult();
 
-    static void stop() {
-        if (Objects.isNull(future)) {
-            return;
-        }
-        future.cancel(true);
-    }
-
 }

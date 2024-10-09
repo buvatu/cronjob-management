@@ -1,34 +1,25 @@
 package com.buvatu.cronjob.management.config;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import com.buvatu.cronjob.management.model.Cronjob;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
-import com.buvatu.cronjob.management.model.Activity;
-import com.buvatu.cronjob.management.model.Cronjob;
-import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
+import java.util.List;
 
 @Configuration
 public class CronjobManagementConfig {
 
-    @Autowired
-    CronjobManagementRepository cronJobManagementRepository;
-
     @Bean
-    List<Cronjob> jobList() {
-        return cronJobManagementRepository.getAllCronjob();
+    ThreadPoolTaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
+        taskScheduler.initialize();
+        return taskScheduler;
     }
 
     @Bean
-    List<Activity> activityList() {
-        return cronJobManagementRepository.getAllSep();
-    }
+    List<Cronjob> cronjobList() {
 
-    @Bean
-    List<Activity> runningActivityList() {
-        return cronJobManagementRepository.getAllSep();
     }
 
 }
