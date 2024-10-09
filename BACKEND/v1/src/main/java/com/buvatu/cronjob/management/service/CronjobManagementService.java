@@ -54,6 +54,20 @@ public class CronjobManagementService {
         cronjob.setPoolSize(poolSize);
     }
 
+    public List<Map<String, Object>> getChangeHistoryList(String cronjobName) {
+        Cronjob cronjob = getCronjob(cronjobName);
+        return cronjob.getChangeHistoryList();
+    }
+
+    public List<Map<String, Object>> getTracingLogList(String cronjobName, String sessionId) {
+        Cronjob cronjob = getCronjob(cronjobName);
+        return cronjob.getTracingLogList(sessionId);
+    }
+
+    public List<Cronjob> getCronjobList() {
+        return cronjobList;
+    }
+
     private Cronjob getCronjob(String cronjobName) {
         if (!StringUtils.hasText(cronjobName)) throw new BusinessException(404, String.format("Cronjob %s is not found", cronjobName));
         Cronjob cronjob = cronjobList.stream().filter(e -> e.getCronjobName().equals(cronjobName)).findFirst().orElse(null);

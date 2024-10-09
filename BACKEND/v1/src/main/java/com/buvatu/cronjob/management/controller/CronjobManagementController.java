@@ -5,8 +5,6 @@ import com.buvatu.cronjob.management.service.CronjobManagementService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 public class CronjobManagementController {
 
@@ -41,15 +39,20 @@ public class CronjobManagementController {
         cronjobManagementService.updatePoolSize(cronjobName, poolSize);
     }
 
-//    @GetMapping("/cronjob/list")
-//    public ResponseEntity<?> getCronjobList() {
-//        return ResponseEntity.ok(cronjobManagementService.getCronjobList());
-//    }
+    @GetMapping("/cronjob/list")
+    public ResponseEntity<?> getCronjobList() {
+        return ResponseEntity.ok(cronjobManagementService.getCronjobList());
+    }
 
-//    @GetMapping("/cronjob/logs")
-//    public ResponseEntity<?> getActiveLogs() {
-//        return ResponseEntity.ok(cronjobManagementService.getActiveLogs());
-//    }
+    @GetMapping("/cronjob/{cronjobName}/history/logs")
+    public ResponseEntity<?> getChangeHistoryList(@PathVariable String cronjobName) {
+        return ResponseEntity.ok(cronjobManagementService.getChangeHistoryList(cronjobName));
+    }
+
+    @GetMapping("/cronjob/{cronjobName}/tracing/logs")
+    public ResponseEntity<?> getTracingLogList(@PathVariable String cronjobName, @RequestParam String sessionId) {
+        return ResponseEntity.ok(cronjobManagementService.getTracingLogList(cronjobName, sessionId));
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<?> handleBusinessException(BusinessException ex) {

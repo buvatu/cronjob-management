@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
@@ -18,54 +19,52 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import javax.annotation.PostConstruct;
 
 @Getter @Setter @Slf4j
-public class Cronjob {
+public abstract class Cronjob {
 
     private final String cronjobName = this.getClass().getSimpleName();
     private String sessionId;
     private String expression;
     private CronjobStatus currentStatus;
     private Integer poolSize = 5; // Default pool_size = 5
+    @JsonIgnore
     private boolean interrupted = false; // Mark a flag to interrupt task when need
-    private ThreadPoolTaskScheduler taskScheduler;
+    @JsonIgnore
     private Runnable task;
+    @JsonIgnore
+    private ScheduledFuture<?> future;
 
+    private final ThreadPoolTaskScheduler taskScheduler;
     private final CronjobManagementRepository cronjobManagementRepository; // helper
 
-    public Cronjob(CronjobManagementRepository cronjobManagementRepository) {
+    protected Cronjob(CronjobManagementRepository cronjobManagementRepository, ThreadPoolTaskScheduler taskScheduler) {
         this.cronjobManagementRepository = cronjobManagementRepository;
+        this.taskScheduler = taskScheduler;
     }
 
     @PostConstruct
     private void initialize() {
         loadConfig();
-        initializeTaskScheduler();
-    }
-
-    private void initializeTaskScheduler() {
-        taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setThreadNamePrefix("cronjob-" + cronjobName + "-");
-        taskScheduler.setPoolSize(poolSize);
-        taskScheduler.initialize();
+        setCurrentStatus(CronjobStatus.UNSCHEDULED);
+        setTask(this::execute);
     }
 
     private void loadConfig() {
         Map<String, Object> cronjobConfigMap = cronjobManagementRepository.getCronjobConfig(getCronjobName());
         poolSize = (Integer) cronjobConfigMap.get("poolSize");
         expression = (String) cronjobConfigMap.get("expression");
-        setCurrentStatus(CronjobStatus.UNSCHEDULED);
     }
 
     public void schedule(String updatedExpression) {
         if (StringUtils.hasText(updatedExpression) && !updatedExpression.equals(expression)) setExpression(updatedExpression);
-        taskScheduler.schedule(this::executeTask, new CronTrigger(expression));
+        future = taskScheduler.schedule(this::executeTask, new CronTrigger(expression));
         setCurrentStatus(CronjobStatus.SCHEDULED);
-        cronjobManagementRepository.insertCronjobHistoryLog(getCronjobHistoryLog("SCHEDULE JOB"));
+        insertCronjobHistoryLog("SCHEDULE JOB");
     }
 
     public void cancel() {
-        taskScheduler.getScheduledThreadPoolExecutor().getQueue().clear();
+        future.cancel(true);
         setCurrentStatus(CronjobStatus.UNSCHEDULED);
-        cronjobManagementRepository.insertCronjobHistoryLog(getCronjobHistoryLog("CANCEL JOB"));
+        insertCronjobHistoryLog("CANCEL JOB");
     }
 
     public void forceStart() {
@@ -96,7 +95,7 @@ public class Cronjob {
     public void setPoolSize(Integer poolSize) {
         this.poolSize = poolSize;
         cronjobManagementRepository.updateCronjobPoolSize(poolSize, cronjobName);
-        cronjobManagementRepository.insertCronjobHistoryLog(getCronjobHistoryLog("UPDATE POOL SIZE TO " + poolSize));
+        insertCronjobHistoryLog("UPDATE POOL SIZE TO " + poolSize);
     }
 
     public void setSessionId(String sessionId) {
@@ -109,21 +108,19 @@ public class Cronjob {
         setInterrupted(false);
         setCurrentStatus(CronjobStatus.RUNNING);
         setSessionId(UUID.randomUUID().toString());
-        Map<String, Object> cronjobHistoryLog = new HashMap<>();
-        cronjobHistoryLog.put("cronjobName", getCronjobName());
-        cronjobHistoryLog.put("sessionId", getSessionId());
-        cronjobHistoryLog.put("beginTime", LocalDateTime.now());
+        LocalDateTime startTime = LocalDateTime.now();
+        String operation = Objects.isNull(RequestContextHolder.getRequestAttributes()) ? "RUN JOB ON A SCHEDULE" : "START JOB MANUALLY";
+        String executor = "RUN JOB ON A SCHEDULE".equals(operation) ? "SYSTEM" : getExecutor();
+        // default is success
+        String executeResult = "SUCCESS";
         try (ExecutorService executorService = Executors.newFixedThreadPool(getPoolSize())){
             executorService.submit(task);
-            cronjobHistoryLog.put("executeResult", isInterrupted() ? "INTERRUPTED" : "SUCCESS");
         } catch (Exception e) {
-            cronjobHistoryLog.put("executeResult", "EXCEPTION: " + e.getMessage());
+            log.error("Failed to execute job {}. Caused by: {}", cronjobName, e.getMessage());
+            executeResult = "EXCEPTION: " + e.getMessage();
         }
-        cronjobHistoryLog.put("endTime", LocalDateTime.now());
-        ServletRequestAttributes servletRequestAttributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        cronjobHistoryLog.put("operation", Objects.isNull(servletRequestAttributes) ? "RUN JOB ON A SCHEDULE" : "START JOB MANUALLY");
-        cronjobHistoryLog.put("executedBy", getExecutor());
-        cronjobManagementRepository.insertCronjobHistoryLog(cronjobHistoryLog);
+        if (interrupted) executeResult = "INTERRUPTED";
+        cronjobManagementRepository.insertCronjobHistoryLog(cronjobName, sessionId, startTime, operation, executor, executeResult);
         setCurrentStatus(currentCronjobStatus);
     }
 
@@ -134,17 +131,22 @@ public class Cronjob {
         return StringUtils.hasText(executor) ? executor : "SYSTEM";
     }
 
-    private Map<String, Object> getCronjobHistoryLog(String operation) {
-        Map<String, Object> cronjobHistoryLog = new HashMap<>();
-        cronjobHistoryLog.put("cronjobName", cronjobName);
-        cronjobHistoryLog.put("sessionId", UUID.randomUUID().toString());
-        cronjobHistoryLog.put("beginTime", LocalDateTime.now());
-        cronjobHistoryLog.put("endTime", LocalDateTime.now());
-        cronjobHistoryLog.put("operation", operation);
-        cronjobHistoryLog.put("executedBy", getExecutor());
-        cronjobHistoryLog.put("executeResult", "SUCCESS");
-        setSessionId(cronjobHistoryLog.get("sessionId").toString());
-        return cronjobHistoryLog;
+    private void insertCronjobHistoryLog(String operation) {
+        cronjobManagementRepository.insertCronjobHistoryLog(cronjobName, sessionId, LocalDateTime.now(), operation, getExecutor(), "SUCCESS");
+    }
+
+    protected void insertTracingLog(String activityName, Integer progressValue) {
+        cronjobManagementRepository.insertTracingLog(cronjobName, sessionId, activityName, progressValue);
+    }
+
+    protected abstract void execute();
+
+    public List<Map<String, Object>> getChangeHistoryList() {
+        return cronjobManagementRepository.getChangeHistoryLogList(cronjobName);
+    }
+
+    public List<Map<String, Object>> getTracingLogList(String sessionId) {
+        return cronjobManagementRepository.getWorkflowLogList(sessionId);
     }
 
 }
