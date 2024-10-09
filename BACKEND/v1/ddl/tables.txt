@@ -1,0 +1,34 @@
+DROP TABLE IF EXISTS public.workflow_config;
+CREATE TABLE public.workflow_config (
+	id uuid DEFAULT gen_random_uuid(),
+	cronjob_name varchar primary key,
+	cronjob_expression varchar,
+	pool_size int default 5,
+	cronjob_status varchar,
+	current_session_id varchar,
+	updated_timestamp timestamp default now(),
+	updated_user varchar
+);
+
+DROP TABLE IF EXISTS public.workflow_log;
+CREATE TABLE public.workflow_log (
+	id serial,
+	cronjob_name varchar,
+	session_id varchar,
+	activity_name varchar,
+	progress_value int,
+	updated_timestamp timestamp default now(),
+	updated_user varchar default 'SYSTEM'
+);
+
+DROP TABLE IF EXISTS public.workflow_change_history;
+CREATE TABLE public.workflow_change_history (
+	id serial,
+	cronjob_name varchar,
+	session_id varchar,
+	start_at timestamp,
+	stop_at timestamp default now(),
+	executed_by varchar,
+	operation varchar,
+	execute_result varchar
+);
