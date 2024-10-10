@@ -6,6 +6,7 @@ CREATE TABLE public.workflow_config (
 	pool_size int default 5,
 	cronjob_status varchar,
 	current_session_id varchar,
+	is_interuppted boolean not null default false,
 	updated_timestamp timestamp default now(),
 	updated_user varchar
 );

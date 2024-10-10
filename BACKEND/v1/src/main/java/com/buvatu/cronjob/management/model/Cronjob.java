@@ -72,7 +72,7 @@ public abstract class Cronjob {
     }
 
     public void forceStop() {
-        interrupted = true;
+        setInterrupted(true);
     }
 
     public void setCurrentStatus(CronjobStatus status) {
@@ -85,6 +85,17 @@ public abstract class Cronjob {
         String currentCronjobStatus = cronjobManagementRepository.getCronjobStatus(cronjobName);
         if (!currentCronjobStatus.equals(currentStatus.name())) setCurrentStatus(CronjobStatus.valueOf(currentCronjobStatus));
         return currentStatus;
+    }
+
+    public boolean isInterrupted() {
+        boolean interrupted = cronjobManagementRepository.isCronjobInteruppted(cronjobName);
+        if (interrupted != this.interrupted) setInterrupted(interrupted);
+        return interrupted;
+    }
+
+    public void setInterrupted(boolean interrupted) {
+        this.interrupted = interrupted;
+        cronjobManagementRepository.updateCronjobInterupptedStatus(interrupted, getCronjobName());
     }
 
     public void setExpression(String expression) {
@@ -105,6 +116,9 @@ public abstract class Cronjob {
 
     private void executeTask() {
         CronjobStatus currentCronjobStatus = getCurrentStatus();
+        if (CronjobStatus.RUNNING.equals(currentCronjobStatus)) {
+            return;
+        }
         setInterrupted(false);
         setCurrentStatus(CronjobStatus.RUNNING);
         setSessionId(UUID.randomUUID().toString());

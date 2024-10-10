@@ -76,11 +76,30 @@ public class CronjobManagementRepository {
         }
     }
 
+    @Transactional
+    public void updateCronjobInterupptedStatus(boolean interupptedStatus, String cronjobName) {
+        try {
+            em.createNativeQuery("update workflow_config set is_interuppted = :interupptedStatus where cronjob_name = :cronjobName").setParameter("interupptedStatus", interupptedStatus).setParameter("cronjobName", cronjobName).executeUpdate();
+            em.flush();
+        } catch (Exception e) {
+            log.error("updateCronjobInterupptedStatus: {}", e.getMessage());
+        }
+    }
+
     public String getCronjobStatus(String cronjobName) {
         try {
             return (String) em.createNativeQuery("select cronjob_status from workflow_config where cronjob_name = :cronjobName").setParameter("cronjobName", cronjobName).getSingleResult();
         } catch (Exception e) {
             log.error("getCronjobStatus: {}", e.getMessage());
+            throw new BusinessException(500, "Failed to execute query");
+        }
+    }
+
+    public boolean isCronjobInteruppted(String cronjobName) {
+        try {
+            return (boolean) em.createNativeQuery("select is_interuppted from workflow_config where cronjob_name = :cronjobName").setParameter("cronjobName", cronjobName).getSingleResult();
+        } catch (Exception e) {
+            log.error("isCronjobInteruppted: {}", e.getMessage());
             throw new BusinessException(500, "Failed to execute query");
         }
     }
