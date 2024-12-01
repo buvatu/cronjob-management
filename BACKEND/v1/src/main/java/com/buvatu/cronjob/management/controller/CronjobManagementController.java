@@ -41,7 +41,7 @@ public class CronjobManagementController {
 
     @GetMapping("/cronjob/list")
     public ResponseEntity<?> getCronjobList() {
-        return ResponseEntity.ok(cronjobManagementService.getCronjobList());
+        return ResponseEntity.ok(cronjobManagementService.getAllCronjob());
     }
 
     @GetMapping("/cronjob/{cronjobName}/history/logs")

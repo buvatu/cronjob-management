@@ -10,7 +10,6 @@ public class CronjobManagementConfig {
     @Bean
     ThreadPoolTaskScheduler taskScheduler() {
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setRemoveOnCancelPolicy(true);
         taskScheduler.initialize();
         return taskScheduler;
     }
