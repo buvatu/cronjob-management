@@ -5,7 +5,6 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import com.buvatu.cronjob.management.repository.CronjobManagementRepository;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
@@ -106,6 +105,10 @@ public abstract class Cronjob {
 
     @PostConstruct
     private void initialize() {
+        if (!cronjobManagementRepository.isCronjobExist(cronjobName)) {
+            cronjobManagementRepository.insertCronjobConfig(cronjobName);
+            return;
+        }
         poolSize = cronjobManagementRepository.getCronjobPoolSize(cronjobName);
         expression = cronjobManagementRepository.getCronjobExpression(cronjobName);
         setCurrentStatus(CronjobStatus.UNSCHEDULED);
@@ -180,7 +183,10 @@ public abstract class Cronjob {
     }
 
     public List<Map<String, Object>> getTracingLogList(String sessionId) {
-        return cronjobManagementRepository.getWorkflowLogList(sessionId);
+        return cronjobManagementRepository.getCronjobRunningLogList(sessionId);
     }
 
+    public LocalDateTime getLastExecutionTime() {
+        return cronjobManagementRepository.getLastExecutionTime(cronjobName);
+    }
 }
