@@ -30,5 +30,6 @@ CREATE TABLE public.cronjob_change_history (
 	stop_time timestamp default now(),
 	executor varchar,
 	operation varchar,
-	execution_result varchar
+	execution_result varchar,
+	description varchar
 );

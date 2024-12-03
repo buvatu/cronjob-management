@@ -13,18 +13,23 @@ public class SecondJob extends Cronjob {
     }
 
     @Override
-    public void execute() {
-        runActivity();
-    }
-
-    private void runActivity() {
-        insertTracingLog("Activity2", 0);
-        for (int i = 0; i < Integer.MAX_VALUE; i++) {
-            if (isInterrupted()) {
-                return;
+    public String getExecutionResult() {
+        try {
+            insertTracingLog("Activity2", 0);
+            for (int i = 0; i < Integer.MAX_VALUE; i++) {
+                if (isInterrupted()) {
+                    return "INTERRUPTED";
+                }
+                if (i == 156956) {
+                    throw new RuntimeException("test exception");
+                }
+                System.out.println(i);
             }
-            System.out.println(i);
+            return "SUCCESS";
+        } catch (Exception e) {
+            return "EXCEPTION: " + e.getMessage();
+        } finally {
+            insertTracingLog("Activity2", 100);
         }
-        insertTracingLog("Activity2", 100);
     }
 }

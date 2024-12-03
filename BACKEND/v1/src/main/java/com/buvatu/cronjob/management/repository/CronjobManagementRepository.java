@@ -2,10 +2,7 @@ package com.buvatu.cronjob.management.repository;
 
 import java.math.BigInteger;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
@@ -30,7 +27,11 @@ public class CronjobManagementRepository {
     @Transactional
     public void insertCronjobConfig(String cronjobName) {
         try {
-            em.createNativeQuery("insert into cronjob_config(cronjob_name) values (:cronjobName)").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
+            em.createNativeQuery("insert into cronjob_config(cronjob_name, cronjob_status, current_session_id) values (:cronjobName, :status, :sessionId)")
+                   .setParameter(CronjobConstant.CRONJOB_NAME, cronjobName)
+                   .setParameter(CronjobConstant.STATUS, CronjobStatus.UNSCHEDULED.name())
+                   .setParameter(CronjobConstant.SESSION_ID, UUID.randomUUID().toString())
+              .executeUpdate();
             em.flush();
         } catch (Exception e) {
             log.error("insertCronjobConfig: {}", e.getMessage());
@@ -87,7 +88,7 @@ public class CronjobManagementRepository {
     @Transactional
     public void updateCronjobStatus(String status, String cronjobName) {
         try {
-            em.createNativeQuery("update cronjob_config set cronjob_status = :status where cronjob_name = :cronjobName").setParameter("status", status).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
+            em.createNativeQuery("update cronjob_config set cronjob_status = :status where cronjob_name = :cronjobName").setParameter(CronjobConstant.STATUS, status).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
             em.flush();
         } catch (Exception e) {
             log.error("updateCronjobStatus: {}", e.getMessage());
@@ -106,22 +107,21 @@ public class CronjobManagementRepository {
     @Transactional
     public void updateCronjobSessionId(String sessionId, String cronjobName) {
         try {
-            em.createNativeQuery("update cronjob_config set current_session_id = :sessionId where cronjob_name = :cronjobName").setParameter("sessionId", sessionId).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
+            em.createNativeQuery("update cronjob_config set current_session_id = :sessionId where cronjob_name = :cronjobName").setParameter(CronjobConstant.SESSION_ID, sessionId).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
             em.flush();
         } catch (Exception e) {
             log.error("updateCronjobSessionId: {}", e.getMessage());
         }
     }
 
-    // --------------------------------------------------------------//
     @Transactional
     public void insertTracingLog(String cronjobName, String sessionId, String activityName, Integer progressValue) {
         try {
             em.createNativeQuery("insert into cronjob_running_log(cronjob_name, session_id, activity_name, progress_value) values (:cronjobName, :sessionId, :activityName, :progressValue)")
                     .setParameter(CronjobConstant.CRONJOB_NAME, cronjobName)
                     .setParameter(CronjobConstant.SESSION_ID, sessionId)
-                    .setParameter("activityName", activityName)
-                    .setParameter("progressValue", progressValue)
+                    .setParameter(CronjobConstant.ACTIVITY_NAME, activityName)
+                    .setParameter(CronjobConstant.PROGRESS_VALUE, progressValue)
               .executeUpdate();
             em.flush();
         } catch (Exception e) {
@@ -130,16 +130,17 @@ public class CronjobManagementRepository {
     }
 
     @Transactional
-    public void insertCronjobChangeHistoryLog(String cronjobName, String sessionId, LocalDateTime startTime, String operation, String executor, String executionResult) {
+    public void insertCronjobChangeHistoryLog(String cronjobName, String sessionId, LocalDateTime startTime, String executor, String operation, String executionResult, String description) {
         try {
-            em.createNativeQuery("insert into cronjob_change_history(cronjob_name, session_id, start_time, operation, executor, execution_result) values (:cronjobName, :sessionId, :startTime, :operation, :executor, :executionResult)")
+            em.createNativeQuery("insert into cronjob_change_history(cronjob_name, session_id, start_time, executor, operation, execution_result, description) values (:cronjobName, :sessionId, :startTime, :executor, :operation, :executionResult, :description)")
                     .setParameter(CronjobConstant.CRONJOB_NAME, cronjobName)
                     .setParameter(CronjobConstant.SESSION_ID, sessionId)
                     .setParameter(CronjobConstant.START_TIME, startTime)
-                    .setParameter(CronjobConstant.OPERATION, operation)
                     .setParameter(CronjobConstant.EXECUTOR, executor)
+                    .setParameter(CronjobConstant.OPERATION, operation)
                     .setParameter(CronjobConstant.EXECUTION_RESULT, executionResult)
-              .executeUpdate();
+                    .setParameter(CronjobConstant.DESCRIPTION, description)
+                    .executeUpdate();
             em.flush();
         } catch (Exception e) {
             log.error("insertCronjobChangeHistoryLog: {}", e.getMessage());
@@ -157,9 +158,9 @@ public class CronjobManagementRepository {
 
     public List<Map<String, Object>> getCronjobChangeHistoryLogList(String cronjobName) {
         try {
-            Stream<?> queryStream = em.createNativeQuery("select session_id, start_time, stop_time, executor, operation, execution_result from cronjob_change_history where cronjob_name = :cronjobName").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getResultStream();
-            return queryStream.map(record -> {
-                Object[] cronjobChangeValues = (Object[]) record;
+            Stream<?> queryStream = em.createNativeQuery("select session_id, start_time, stop_time, executor, operation, execution_result, description from cronjob_change_history where cronjob_name = :cronjobName").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getResultStream();
+            return queryStream.map(recordData -> {
+                Object[] cronjobChangeValues = (Object[]) recordData;
                 Map<String, Object> cronjobChangeHistoryMap = new HashMap<>();
                 cronjobChangeHistoryMap.put(CronjobConstant.CRONJOB_NAME, cronjobName);
                 cronjobChangeHistoryMap.put(CronjobConstant.SESSION_ID, cronjobChangeValues[0]);
@@ -168,6 +169,7 @@ public class CronjobManagementRepository {
                 cronjobChangeHistoryMap.put(CronjobConstant.EXECUTOR, cronjobChangeValues[3]);
                 cronjobChangeHistoryMap.put(CronjobConstant.OPERATION, cronjobChangeValues[4]);
                 cronjobChangeHistoryMap.put(CronjobConstant.EXECUTION_RESULT, cronjobChangeValues[5]);
+                cronjobChangeHistoryMap.put(CronjobConstant.DESCRIPTION, cronjobChangeValues[6]);
                 return cronjobChangeHistoryMap;
             }).toList();
         } catch (Exception e) {
@@ -179,8 +181,8 @@ public class CronjobManagementRepository {
     public List<Map<String, Object>> getCronjobRunningLogList(String sessionId) {
         try {
             Stream<?> queryStream = em.createNativeQuery("select cronjob_name, activity_name, progress_value from cronjob_running_log where session_id = :sessionId").setParameter(CronjobConstant.SESSION_ID, sessionId).getResultStream();
-            return queryStream.map(record -> {
-                Object[] runningLogValues = (Object[]) record;
+            return queryStream.map(recordData -> {
+                Object[] runningLogValues = (Object[]) recordData;
                 Map<String, Object> cronjobRunningLogMap = new HashMap<>();
                 cronjobRunningLogMap.put(CronjobConstant.CRONJOB_NAME, runningLogValues[0]);
                 cronjobRunningLogMap.put(CronjobConstant.SESSION_ID, sessionId);

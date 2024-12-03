@@ -5,11 +5,13 @@ public class CronjobConstant {
     // Variables
     public static final String SYSTEM = "SYSTEM";
     public static final String CRONJOB_NAME = "cronjobName";
+    public static final String STATUS = "status";
     public static final String SESSION_ID = "sessionId";
     public static final String EXPRESSION = "expression";
     public static final String POOL_SIZE = "poolSize";
     public static final String LAST_EXECUTION_TIME = "lastExecutionTime";
     public static final String OPERATION = "operation";
+    public static final String DESCRIPTION = "description";
     public static final String EXECUTOR = "executor";
     public static final String EXECUTION_RESULT = "executionResult";
     public static final String START_TIME = "startTime";
