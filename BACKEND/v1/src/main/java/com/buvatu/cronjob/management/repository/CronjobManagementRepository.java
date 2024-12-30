@@ -1,6 +1,5 @@
 package com.buvatu.cronjob.management.repository;
 
-import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Stream;
@@ -11,6 +10,8 @@ import javax.transaction.Transactional;
 
 import com.buvatu.cronjob.management.model.CronjobConstant;
 import com.buvatu.cronjob.management.model.CronjobStatus;
+import com.buvatu.cronjob.management.model.ExecutionResult;
+import com.buvatu.cronjob.management.model.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
@@ -21,7 +22,7 @@ public class CronjobManagementRepository {
     private EntityManager em;
 
     public boolean isCronjobExist(String cronjobName) {
-        return ((BigInteger) em.createNativeQuery("select count(cronjob_name) from cronjob_config where cronjob_name = :cronjobName").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getSingleResult()).intValue() > 0;
+        return (boolean) em.createNativeQuery("select exists(select 1 from cronjob_config where cronjob_name = :cronjobName)").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getSingleResult();
     }
 
     @Transactional
@@ -48,9 +49,13 @@ public class CronjobManagementRepository {
     }
 
     @Transactional
-    public void updateCronjobExpression(String expression, String cronjobName) {
+    public void updateCronjobExpression(String cronjobName, String expression, String executor) {
         try {
-            em.createNativeQuery("update cronjob_config set cronjob_expression = :expression where cronjob_name = :cronjobName").setParameter("expression", expression).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
+            em.createNativeQuery("update cronjob_config set cronjob_expression = :expression, updated_user = :executor where cronjob_name = :cronjobName")
+                    .setParameter(CronjobConstant.CRONJOB_NAME, cronjobName)
+                    .setParameter("expression", expression)
+                    .setParameter("updated_user", executor)
+                    .executeUpdate();
             em.flush();
         } catch (Exception e) {
             log.error("updateCronjobExpression: {}", e.getMessage());
@@ -67,9 +72,13 @@ public class CronjobManagementRepository {
     }
 
     @Transactional
-    public void updateCronjobPoolSize(Integer poolSize, String cronjobName) {
+    public void updateCronjobPoolSize(String cronjobName, Integer poolSize, String executor) {
         try {
-            em.createNativeQuery("update cronjob_config set cronjob_pool_size = :poolSize where cronjob_name = :cronjobName").setParameter("poolSize", poolSize).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
+            em.createNativeQuery("update cronjob_config set cronjob_pool_size = :poolSize, updated_user = :executor where cronjob_name = :cronjobName")
+                    .setParameter(CronjobConstant.CRONJOB_NAME, cronjobName)
+                    .setParameter("poolSize", poolSize)
+                    .setParameter("updated_user", executor)
+                    .executeUpdate();
             em.flush();
         } catch (Exception e) {
             log.error("updateCronjobPoolSize: {}", e.getMessage());
@@ -86,7 +95,7 @@ public class CronjobManagementRepository {
     }
 
     @Transactional
-    public void updateCronjobStatus(String status, String cronjobName) {
+    public void updateCronjobStatus(String cronjobName, String status) {
         try {
             em.createNativeQuery("update cronjob_config set cronjob_status = :status where cronjob_name = :cronjobName").setParameter(CronjobConstant.STATUS, status).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
             em.flush();
@@ -105,7 +114,7 @@ public class CronjobManagementRepository {
     }
 
     @Transactional
-    public void updateCronjobSessionId(String sessionId, String cronjobName) {
+    public void updateCronjobSessionId(String cronjobName, String sessionId) {
         try {
             em.createNativeQuery("update cronjob_config set current_session_id = :sessionId where cronjob_name = :cronjobName").setParameter(CronjobConstant.SESSION_ID, sessionId).setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).executeUpdate();
             em.flush();
@@ -130,15 +139,15 @@ public class CronjobManagementRepository {
     }
 
     @Transactional
-    public void insertCronjobChangeHistoryLog(String cronjobName, String sessionId, LocalDateTime startTime, String executor, String operation, String executionResult, String description) {
+    public void insertCronjobChangeHistoryLog(String cronjobName, String sessionId, LocalDateTime startTime, String executor, Operation operation, ExecutionResult executionResult, String description) {
         try {
             em.createNativeQuery("insert into cronjob_change_history(cronjob_name, session_id, start_time, executor, operation, execution_result, description) values (:cronjobName, :sessionId, :startTime, :executor, :operation, :executionResult, :description)")
                     .setParameter(CronjobConstant.CRONJOB_NAME, cronjobName)
                     .setParameter(CronjobConstant.SESSION_ID, sessionId)
                     .setParameter(CronjobConstant.START_TIME, startTime)
                     .setParameter(CronjobConstant.EXECUTOR, executor)
-                    .setParameter(CronjobConstant.OPERATION, operation)
-                    .setParameter(CronjobConstant.EXECUTION_RESULT, executionResult)
+                    .setParameter(CronjobConstant.OPERATION, operation.name())
+                    .setParameter(CronjobConstant.EXECUTION_RESULT, executionResult.name())
                     .setParameter(CronjobConstant.DESCRIPTION, description)
                     .executeUpdate();
             em.flush();

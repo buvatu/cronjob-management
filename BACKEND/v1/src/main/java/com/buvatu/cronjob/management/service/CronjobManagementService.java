@@ -26,7 +26,7 @@ public class CronjobManagementService {
         if (Objects.isNull(poolSize) || poolSize < 1 || poolSize.equals(cronjob.getPoolSize())) throw new BusinessException(400, CronjobConstant.POOL_SIZE_IS_NOT_VALID);
         if (!CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_MUST_BE_UNSCHEDULED, cronjobName));
         cronjob.setExecutor(executor);
-        cronjob.setDescription(description);
+        cronjob.setDescription("PREVIOUS POOL SIZE: " + cronjob.getPoolSize() + "--> UPDATED POOL SIZE: " + poolSize + ". REASON: " + description);
         cronjob.setPoolSize(poolSize);
     }
 
@@ -35,7 +35,7 @@ public class CronjobManagementService {
         Cronjob cronjob = getCronjob(cronjobName);
         if (!CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_MUST_BE_UNSCHEDULED, cronjobName));
         cronjob.setExecutor(executor);
-        cronjob.setDescription(description);
+        cronjob.setDescription("PREVIOUS CRON EXPRESSION: " + cronjob.getExpression() + "--> UPDATED CRON EXPRESSION: " + expression + ". REASON: " + description);
         cronjob.setExpression(expression);
     }
 
@@ -51,7 +51,7 @@ public class CronjobManagementService {
 
     public void cancel(String cronjobName, String executor, String description) {
         Cronjob cronjob = getCronjob(cronjobName);
-        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus()) || CronjobStatus.INTERRUPTED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
+        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
         if (CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_ALREADY_UNSCHEDULED, cronjobName));
         cronjob.setExecutor(executor);
         cronjob.setDescription(description);
@@ -60,15 +60,17 @@ public class CronjobManagementService {
 
     public void forceStart(String cronjobName, String executor, String description) {
         Cronjob cronjob = getCronjob(cronjobName);
-        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus()) || CronjobStatus.INTERRUPTED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
+        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
         cronjob.setExecutor(executor);
         cronjob.setDescription(description);
         cronjob.forceStart();
     }
 
-    public void forceStop(String cronjobName) {
+    public void forceStop(String cronjobName, String executor, String description) {
         Cronjob cronjob = getCronjob(cronjobName);
         if (!CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_NOT_RUNNING, cronjobName));
+        cronjob.setExecutor(executor);
+        cronjob.setDescription(description);
         cronjob.forceStop();
     }
 

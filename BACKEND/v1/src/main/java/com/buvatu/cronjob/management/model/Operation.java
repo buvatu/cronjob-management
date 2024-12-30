@@ -1,0 +1,5 @@
+package com.buvatu.cronjob.management.model;
+
+public enum Operation {
+    UPDATE_POOL_SIZE, UPDATE_CRON_EXPRESSION, SCHEDULE_JOB, CANCEL_JOB, START_JOB_MANUALLY, STOP_JOB_MANUALLY, EXECUTE_JOB_ON_A_SCHEDULE
+}

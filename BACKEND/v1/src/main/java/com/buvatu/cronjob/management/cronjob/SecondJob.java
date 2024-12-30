@@ -8,18 +8,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class SecondJob extends Cronjob {
 
-    public SecondJob(CronjobManagementRepository cronjobManagementRepository, ThreadPoolTaskScheduler taskScheduler) {
-        super(cronjobManagementRepository, taskScheduler);
-    }
-
     @Override
     public String getExecutionResult() {
         try {
             insertTracingLog("Activity2", 0);
             for (int i = 0; i < Integer.MAX_VALUE; i++) {
-                if (isInterrupted()) {
-                    return "INTERRUPTED";
-                }
                 if (i == 156956) {
                     throw new RuntimeException("test exception");
                 }
