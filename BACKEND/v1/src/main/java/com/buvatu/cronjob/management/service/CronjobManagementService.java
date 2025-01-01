@@ -66,13 +66,13 @@ public class CronjobManagementService {
         cronjob.forceStart();
     }
 
-    public void forceStop(String cronjobName, String executor, String description) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        if (!CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_NOT_RUNNING, cronjobName));
-        cronjob.setExecutor(executor);
-        cronjob.setDescription(description);
-        cronjob.forceStop();
-    }
+//    public void forceStop(String cronjobName, String executor, String description) {
+//        Cronjob cronjob = getCronjob(cronjobName);
+//        if (!CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_NOT_RUNNING, cronjobName));
+//        cronjob.setExecutor(executor);
+//        cronjob.setDescription(description);
+//        cronjob.forceStop();
+//    }
 
     public List<Map<String, Object>> getChangeHistoryList(String cronjobName) {
         Cronjob cronjob = getCronjob(cronjobName);
@@ -82,6 +82,11 @@ public class CronjobManagementService {
     public List<Map<String, Object>> getTracingLogList(String cronjobName, String sessionId) {
         Cronjob cronjob = getCronjob(cronjobName);
         return cronjob.getTracingLogList(sessionId);
+    }
+
+    public List<Map<String, Object>> getAllRunningHistory(String cronjobName) {
+        Cronjob cronjob = getCronjob(cronjobName);
+        return cronjob.getAllRunningHistory();
     }
 
     private Cronjob getCronjob(String cronjobName) {

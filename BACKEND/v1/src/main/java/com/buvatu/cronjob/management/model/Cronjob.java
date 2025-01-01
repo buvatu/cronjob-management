@@ -1,6 +1,5 @@
 package com.buvatu.cronjob.management.model;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
@@ -133,13 +132,12 @@ public abstract class Cronjob {
     }
 
     public void forceStart() {
-        // future = taskScheduler.schedule(this::executeTask, Instant.now().plusSeconds(1)); // Start after 1s
         taskScheduler.submit(this::executeTask);
     }
 
-    public void forceStop() {
-        future.cancel(true);
-    }
+//    public void forceStop() {
+//        future.cancel(true);
+//    }
 
     private void executeTask() {
         CronjobStatus cronjobStatusBeforeRunning = getCurrentStatus();
@@ -178,6 +176,10 @@ public abstract class Cronjob {
 
     public List<Map<String, Object>> getChangeHistoryList() {
         return cronjobManagementRepository.getCronjobChangeHistoryLogList(cronjobName);
+    }
+
+    public List<Map<String, Object>> getAllRunningHistory() {
+        return cronjobManagementRepository.getAllRunningHistory(cronjobName);
     }
 
     public List<Map<String, Object>> getTracingLogList(String sessionId) {

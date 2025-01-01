@@ -158,7 +158,7 @@ public class CronjobManagementRepository {
 
     public LocalDateTime getLastExecutionTime(String cronjobName) {
         try {
-            return (LocalDateTime) em.createNativeQuery("select start_at from cronjob_change_history where (operation = 'RUN JOB ON A SCHEDULE' or operation = 'START JOB MANUALLY') and cronjob_name = :cronjobName order by id desc limit 1").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getSingleResult();
+            return (LocalDateTime) em.createNativeQuery("select start_at from cronjob_change_history where (operation = 'EXECUTE_JOB_ON_A_SCHEDULE' or operation = 'START_JOB_MANUALLY') and cronjob_name = :cronjobName order by id desc limit 1").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getSingleResult();
         } catch (Exception e) {
             log.error("getLastExecutionTime: {}", e.getMessage());
             return null;
@@ -168,23 +168,37 @@ public class CronjobManagementRepository {
     public List<Map<String, Object>> getCronjobChangeHistoryLogList(String cronjobName) {
         try {
             Stream<?> queryStream = em.createNativeQuery("select session_id, start_time, stop_time, executor, operation, execution_result, description from cronjob_change_history where cronjob_name = :cronjobName").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getResultStream();
-            return queryStream.map(recordData -> {
-                Object[] cronjobChangeValues = (Object[]) recordData;
-                Map<String, Object> cronjobChangeHistoryMap = new HashMap<>();
-                cronjobChangeHistoryMap.put(CronjobConstant.CRONJOB_NAME, cronjobName);
-                cronjobChangeHistoryMap.put(CronjobConstant.SESSION_ID, cronjobChangeValues[0]);
-                cronjobChangeHistoryMap.put(CronjobConstant.START_TIME, cronjobChangeValues[1]);
-                cronjobChangeHistoryMap.put(CronjobConstant.STOP_TIME, cronjobChangeValues[2]);
-                cronjobChangeHistoryMap.put(CronjobConstant.EXECUTOR, cronjobChangeValues[3]);
-                cronjobChangeHistoryMap.put(CronjobConstant.OPERATION, cronjobChangeValues[4]);
-                cronjobChangeHistoryMap.put(CronjobConstant.EXECUTION_RESULT, cronjobChangeValues[5]);
-                cronjobChangeHistoryMap.put(CronjobConstant.DESCRIPTION, cronjobChangeValues[6]);
-                return cronjobChangeHistoryMap;
-            }).toList();
+            return getCronjobChangeHistoryMap(cronjobName, queryStream);
         } catch (Exception e) {
             log.error("getCronjobChangeHistoryLogList: {}", e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    public List<Map<String, Object>> getAllRunningHistory(String cronjobName) {
+        try {
+            Stream<?> queryStream = em.createNativeQuery("select session_id, start_time, stop_time, executor, operation, execution_result, description from cronjob_change_history where operation in ('START_JOB_MANUALLY', 'EXECUTE_JOB_ON_A_SCHEDULE') and cronjob_name = :cronjobName").setParameter(CronjobConstant.CRONJOB_NAME, cronjobName).getResultStream();
+            return getCronjobChangeHistoryMap(cronjobName, queryStream);
+        } catch (Exception e) {
+            log.error("getAllCronjobRunningHistory: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private List<Map<String, Object>> getCronjobChangeHistoryMap(String cronjobName, Stream<?> queryStream) {
+        return queryStream.map(recordData -> {
+            Object[] cronjobChangeValues = (Object[]) recordData;
+            Map<String, Object> cronjobChangeHistoryMap = new HashMap<>();
+            cronjobChangeHistoryMap.put(CronjobConstant.CRONJOB_NAME, cronjobName);
+            cronjobChangeHistoryMap.put(CronjobConstant.SESSION_ID, cronjobChangeValues[0]);
+            cronjobChangeHistoryMap.put(CronjobConstant.START_TIME, cronjobChangeValues[1]);
+            cronjobChangeHistoryMap.put(CronjobConstant.STOP_TIME, cronjobChangeValues[2]);
+            cronjobChangeHistoryMap.put(CronjobConstant.EXECUTOR, cronjobChangeValues[3]);
+            cronjobChangeHistoryMap.put(CronjobConstant.OPERATION, cronjobChangeValues[4]);
+            cronjobChangeHistoryMap.put(CronjobConstant.EXECUTION_RESULT, cronjobChangeValues[5]);
+            cronjobChangeHistoryMap.put(CronjobConstant.DESCRIPTION, cronjobChangeValues[6]);
+            return cronjobChangeHistoryMap;
+        }).toList();
     }
 
     public List<Map<String, Object>> getCronjobRunningLogList(String sessionId) {

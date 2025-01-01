@@ -5,8 +5,14 @@
     <option name="originalFiles">
       <list>
         <option value="$PROJECT_DIR$/pom.xml" />
+        <option value="$PROJECT_DIR$/../../../IDEMPOTENCY_HELPER/idempotency-helper/pom.xml" />
       </list>
     </option>
+    <option name="ignoredFiles">
+      <set>
+        <option value="$PROJECT_DIR$/../../../IDEMPOTENCY_HELPER/idempotency-helper/pom.xml" />
+      </set>
+    </option>
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="openjdk-22" project-jdk-type="JavaSDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="corretto-21" project-jdk-type="JavaSDK" />
 </project>

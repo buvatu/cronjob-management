@@ -59,6 +59,11 @@ public class CronjobManagementController {
         return ResponseEntity.ok(cronjobManagementService.getTracingLogList(cronjobName, sessionId));
     }
 
+    @GetMapping("/cronjob/{cronjobName}/history/running")
+    public ResponseEntity<?> getAllRunningHistory(@PathVariable String cronjobName) {
+        return ResponseEntity.ok(cronjobManagementService.getAllRunningHistory(cronjobName));
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<?> handleBusinessException(BusinessException ex) {
         return ResponseEntity.status(ex.getCode()).body(ex.getMessage());
