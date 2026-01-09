@@ -1,4 +1,4 @@
-package com.buvatu.cronjob.management.model;
+package com.buvatu.cronjob.management.exception;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

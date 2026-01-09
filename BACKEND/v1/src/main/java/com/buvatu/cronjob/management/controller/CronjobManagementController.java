@@ -1,9 +1,11 @@
 package com.buvatu.cronjob.management.controller;
 
-import com.buvatu.cronjob.management.model.BusinessException;
+import com.buvatu.cronjob.management.exception.BusinessException;
 import com.buvatu.cronjob.management.service.CronjobManagementService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController @RestControllerAdvice
 public class CronjobManagementController {
@@ -39,14 +41,14 @@ public class CronjobManagementController {
         cronjobManagementService.forceStart(cronjobName, executor, description);
     }
 
-//    @PostMapping("/cronjob/{cronjobName}/stop")
-//    public void stopRunningCronjob(@PathVariable String cronjobName, @RequestParam String executor, @RequestParam(required = false, defaultValue = "") String description) {
-//        cronjobManagementService.forceStop(cronjobName, executor, description);
-//    }
+    @PostMapping("/cronjob/{cronjobName}/stop")
+    public void stopRunningCronjob(@PathVariable String cronjobName, @RequestParam String executor, @RequestParam(required = false, defaultValue = "") String description) {
+        cronjobManagementService.forceStop(cronjobName, executor, description);
+    }
 
     @GetMapping("/cronjob/list")
     public ResponseEntity<?> getCronjobList() {
-        return ResponseEntity.ok(cronjobManagementService.getAllCronjob());
+        return ResponseEntity.ok(cronjobManagementService.getAllCronjobs());
     }
 
     @GetMapping("/cronjob/{cronjobName}/history/logs")
@@ -55,7 +57,7 @@ public class CronjobManagementController {
     }
 
     @GetMapping("/cronjob/{cronjobName}/tracing/logs")
-    public ResponseEntity<?> getTracingLogList(@PathVariable String cronjobName, @RequestParam String sessionId) {
+    public ResponseEntity<?> getTracingLogList(@PathVariable String cronjobName, @RequestParam UUID sessionId) {
         return ResponseEntity.ok(cronjobManagementService.getTracingLogList(cronjobName, sessionId));
     }
 

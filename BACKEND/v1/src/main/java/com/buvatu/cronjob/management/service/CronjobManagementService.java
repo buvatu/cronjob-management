@@ -2,11 +2,12 @@ package com.buvatu.cronjob.management.service;
 
 import java.util.*;
 
-import com.buvatu.cronjob.management.model.BusinessException;
+import com.buvatu.cronjob.management.entity.JobExecution;
+import com.buvatu.cronjob.management.entity.JobExecutionLog;
+import com.buvatu.cronjob.management.entity.JobOperation;
+import com.buvatu.cronjob.management.exception.BusinessException;
 
-import com.buvatu.cronjob.management.model.CronjobConstant;
-import com.buvatu.cronjob.management.model.CronjobStatus;
-import org.springframework.scheduling.support.CronExpression;
+import com.buvatu.cronjob.management.constant.CronjobConstant;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -22,86 +23,54 @@ public class CronjobManagementService {
     }
 
     public void updatePoolSize(String cronjobName, Integer poolSize, String executor, String description) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        if (Objects.isNull(poolSize) || poolSize < 1 || poolSize.equals(cronjob.getPoolSize())) throw new BusinessException(400, CronjobConstant.POOL_SIZE_IS_NOT_VALID);
-        if (!CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_MUST_BE_UNSCHEDULED, cronjobName));
-        cronjob.setExecutor(executor);
-        cronjob.setDescription("PREVIOUS POOL SIZE: " + cronjob.getPoolSize() + "--> UPDATED POOL SIZE: " + poolSize + ". REASON: " + description);
-        cronjob.setPoolSize(poolSize);
+        getCronjob(cronjobName).updatePoolSize(executor, description, poolSize);
     }
 
     public void updateExpression(String cronjobName, String expression, String executor, String description) {
-        if (!CronExpression.isValidExpression(expression)) throw new BusinessException(400, CronjobConstant.EXPRESSION_IS_NOT_VALID);
-        Cronjob cronjob = getCronjob(cronjobName);
-        if (!CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_MUST_BE_UNSCHEDULED, cronjobName));
-        cronjob.setExecutor(executor);
-        cronjob.setDescription("PREVIOUS CRON EXPRESSION: " + cronjob.getExpression() + "--> UPDATED CRON EXPRESSION: " + expression + ". REASON: " + description);
-        cronjob.setExpression(expression);
+        getCronjob(cronjobName).updateExpression(executor, description, expression);
     }
 
     public void schedule(String cronjobName, String executor, String description) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        if (!CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_MUST_BE_UNSCHEDULED, cronjobName));
-        if (!CronExpression.isValidExpression(cronjob.getExpression())) throw new BusinessException(400, CronjobConstant.EXPRESSION_IS_NOT_VALID);
-        if (Objects.isNull(cronjob.getPoolSize()) || cronjob.getPoolSize() < 1) throw new BusinessException(400, CronjobConstant.POOL_SIZE_IS_NOT_VALID);
-        cronjob.setExecutor(executor);
-        cronjob.setDescription(description);
-        cronjob.schedule();
+        getCronjob(cronjobName).schedule(executor, description);
     }
 
     public void cancel(String cronjobName, String executor, String description) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
-        if (CronjobStatus.UNSCHEDULED.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_ALREADY_UNSCHEDULED, cronjobName));
-        cronjob.setExecutor(executor);
-        cronjob.setDescription(description);
-        cronjob.cancel();
+        getCronjob(cronjobName).cancel(executor, description);
     }
 
     public void forceStart(String cronjobName, String executor, String description) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        if (CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
-        cronjob.setExecutor(executor);
-        cronjob.setDescription(description);
-        cronjob.forceStart();
+        getCronjob(cronjobName).forceStart(executor, description);
     }
 
-//    public void forceStop(String cronjobName, String executor, String description) {
-//        Cronjob cronjob = getCronjob(cronjobName);
-//        if (!CronjobStatus.RUNNING.equals(cronjob.getCurrentStatus())) throw new BusinessException(400, String.format(CronjobConstant.CRONJOB_IS_NOT_RUNNING, cronjobName));
-//        cronjob.setExecutor(executor);
-//        cronjob.setDescription(description);
-//        cronjob.forceStop();
-//    }
-
-    public List<Map<String, Object>> getChangeHistoryList(String cronjobName) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        return cronjob.getChangeHistoryList();
+    public void forceStop(String cronjobName, String executor, String description) {
+        getCronjob(cronjobName).forceStop(executor, description);
     }
 
-    public List<Map<String, Object>> getTracingLogList(String cronjobName, String sessionId) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        return cronjob.getTracingLogList(sessionId);
+    public List<JobOperation> getChangeHistoryList(String cronjobName) {
+        return getCronjob(cronjobName).getChangeHistoryList();
     }
 
-    public List<Map<String, Object>> getAllRunningHistory(String cronjobName) {
-        Cronjob cronjob = getCronjob(cronjobName);
-        return cronjob.getAllRunningHistory();
+    public List<JobExecutionLog> getTracingLogList(String cronjobName, UUID sessionId) {
+        return getCronjob(cronjobName).getTracingLogList(sessionId);
+    }
+
+    public List<JobExecution> getAllRunningHistory(String cronjobName) {
+        return getCronjob(cronjobName).getAllRunningHistory();
     }
 
     private Cronjob getCronjob(String cronjobName) {
-        if (!StringUtils.hasText(cronjobName)) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_IS_NOT_FOUND, cronjobName));
+        if (!StringUtils.hasText(cronjobName)) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName));
         Cronjob cronjob = cronjobList.stream().filter(e -> e.getCronjobName().equals(cronjobName)).findFirst().orElse(null);
-        if (Objects.isNull(cronjob)) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_IS_NOT_FOUND, cronjobName));
+        if (Objects.isNull(cronjob)) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName));
         return cronjob;
     }
 
-    public List<Map<String, Object>> getAllCronjob() {
+    public List<Map<String, Object>> getAllCronjobs() {
         return cronjobList.stream().map(e -> {
             Map<String, Object> map = new HashMap<>();
             map.put(CronjobConstant.CRONJOB_NAME, e.getCronjobName());
-            map.put(CronjobConstant.EXPRESSION, e.getExpression());
-            map.put(CronjobConstant.POOL_SIZE, e.getPoolSize());
+            map.put(CronjobConstant.EXPRESSION, e.getConfig().getExpression());
+            map.put(CronjobConstant.POOL_SIZE, e.getConfig().getPoolSize());
             map.put(CronjobConstant.LAST_EXECUTION_TIME, e.getLastExecutionTime());
             return map;
         }).toList();

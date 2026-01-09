@@ -1,35 +1,58 @@
-DROP TABLE IF EXISTS public.cronjob_config;
-CREATE TABLE public.cronjob_config (
-	id uuid DEFAULT gen_random_uuid(),
-	cronjob_name varchar primary key,
-	cronjob_expression varchar,
-	cronjob_pool_size int default 5,
-	cronjob_status varchar,
-	current_session_id varchar,
-	updated_timestamp timestamp default now(),
-	updated_user varchar default 'SYSTEM'
+DROP TABLE IF EXISTS public.job_config;
+CREATE TABLE public.job_config
+(
+    id         uuid default gen_random_uuid() primary key,
+    name       varchar(100) unique not null,
+    expression varchar(20),
+    pool_size  int  default 1,
+    status     varchar(20),
+    description varchar,
+    created_at timestamptz,
+    created_by varchar(20),
+    updated_at timestamptz,
+    updated_by varchar(20),
+    version    bigint
 );
 
-DROP TABLE IF EXISTS public.cronjob_running_log;
-CREATE TABLE public.cronjob_running_log (
-	id serial,
-	cronjob_name varchar,
-	session_id varchar,
-	activity_name varchar,
-	progress_value int,
-	updated_timestamp timestamp default now(),
-	updated_user varchar default 'SYSTEM'
+DROP TABLE IF EXISTS public.job_execution;
+CREATE TABLE public.job_execution
+(
+    id           uuid default gen_random_uuid() primary key,
+    job_name     varchar(100),
+    trigger_type varchar(10),
+    executor     varchar(20),
+    instance_id  varchar(100),
+    exit_code    int,
+    output       varchar,
+    duration     bigint,
+    status       varchar(20),
+    description  varchar,
+    created_at   timestamptz,
+    created_by   varchar(20),
+    updated_at   timestamptz,
+    updated_by   varchar(20)
+);
+CREATE UNIQUE INDEX idx_unique_running_job ON job_execution (job_name) WHERE status = 'RUNNING';
+
+
+DROP TABLE IF EXISTS public.job_execution_log;
+CREATE TABLE public.job_execution_log
+(
+    id           uuid default gen_random_uuid() primary key,
+    session_id     uuid,
+    activity_name  varchar(100),
+    progress_value int,
+    description    varchar,
+    created_at     timestamptz
 );
 
-DROP TABLE IF EXISTS public.cronjob_change_history;
-CREATE TABLE public.cronjob_change_history (
-	id serial,
-	cronjob_name varchar,
-	session_id varchar,
-	start_time timestamp,
-	stop_time timestamp default now(),
-	executor varchar,
-	operation varchar,
-	execution_result varchar,
-	description varchar
+DROP TABLE IF EXISTS public.job_operation;
+CREATE TABLE public.job_operation
+(
+    id          uuid default gen_random_uuid() primary key,
+    job_name    varchar(100),
+    operation   varchar(50),
+    executor    varchar(20),
+    description varchar,
+    executed_at timestamptz
 );
