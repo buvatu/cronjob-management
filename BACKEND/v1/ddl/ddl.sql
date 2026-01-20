@@ -49,10 +49,12 @@ CREATE TABLE public.job_execution_log
 DROP TABLE IF EXISTS public.job_operation;
 CREATE TABLE public.job_operation
 (
-    id          uuid default gen_random_uuid() primary key,
-    job_name    varchar(100),
-    operation   varchar(50),
-    executor    varchar(20),
-    description varchar,
-    executed_at timestamptz
+    id            uuid default gen_random_uuid() primary key,
+    job_name      varchar(100),
+    operation     varchar(50),
+    executor      varchar(20),
+    result        varchar(20),
+    error_message varchar,
+    description   varchar,
+    executed_at   timestamptz
 );

@@ -80,11 +80,19 @@ public abstract class Cronjob {
     }
 
     public void schedule(String executor, String description) {
-        if (isRunning()) throw new BusinessException(409, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
+        if (isRunning())
+            handleFailOperation(JobOperation.Operation.SCHEDULE_JOB, executor, description,
+                    String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
         reloadConfig();
-        if (config.getStatus().equals(BaseEntity.Status.SCHEDULED)) throw new BusinessException(409, CronjobConstant.CRONJOB_MUST_BE_UNSCHEDULED);
-        if (!CronExpression.isValidExpression(config.getExpression())) throw new BusinessException(400, CronjobConstant.EXPRESSION_IS_NOT_VALID);
-        if (Objects.isNull(config.getPoolSize()) || config.getPoolSize() < 1) throw new BusinessException(400, CronjobConstant.POOL_SIZE_IS_NOT_VALID);
+        if (config.getStatus().equals(BaseEntity.Status.SCHEDULED))
+            handleFailOperation(JobOperation.Operation.SCHEDULE_JOB, executor, description,
+                    CronjobConstant.CRONJOB_MUST_BE_UNSCHEDULED, 409);
+        if (!CronExpression.isValidExpression(config.getExpression()))
+            handleFailOperation(JobOperation.Operation.SCHEDULE_JOB, executor, description,
+                    CronjobConstant.EXPRESSION_IS_NOT_VALID, 400);
+        if (Objects.isNull(config.getPoolSize()) || config.getPoolSize() < 1)
+            handleFailOperation(JobOperation.Operation.SCHEDULE_JOB, executor, description,
+                    CronjobConstant.POOL_SIZE_IS_NOT_VALID, 400);
         future = taskScheduler.schedule(this::executeTask, new CronTrigger(config.getExpression()));
         config.setStatus(BaseEntity.Status.SCHEDULED);
         jobConfigRepository.save(config);
@@ -92,13 +100,22 @@ public abstract class Cronjob {
         insertJobOperationHistoryLog(executor, JobOperation.Operation.SCHEDULE_JOB, description);
     }
 
-    public void updateExpression(String executor, String description,@NonNull String expression) {
-        if (isRunning()) throw new BusinessException(409, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
+    public void updateExpression(String executor, String description, @NonNull String expression) {
+        if (isRunning())
+            handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
+                    String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
         reloadConfig();
-        if (Objects.isNull(config)) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName));
-        if (!CronExpression.isValidExpression(expression)) throw new BusinessException(400, CronjobConstant.EXPRESSION_IS_NOT_VALID);
-        if (Objects.equals(config.getExpression(), expression)) throw new BusinessException(409, CronjobConstant.EXPRESSION_IS_NOT_CHANGED);
-        String expressionDescription = "UPDATED EXPRESSION: " + config.getExpression() + " --> " + expression + ". REASON: " + description;
+        if (Objects.isNull(config))
+            handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
+                    String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName), 404);
+        if (!CronExpression.isValidExpression(expression))
+            handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
+                    CronjobConstant.EXPRESSION_IS_NOT_VALID, 400);
+        if (Objects.equals(config.getExpression(), expression))
+            handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
+                    CronjobConstant.EXPRESSION_IS_NOT_CHANGED, 409);
+        String expressionDescription = "UPDATED EXPRESSION: " + config.getExpression() + " --> " + expression
+                + ". REASON: " + description;
         config.setExpression(expression);
         jobConfigRepository.save(config);
         jobConfigRepository.flush();
@@ -109,22 +126,38 @@ public abstract class Cronjob {
     }
 
     public void updatePoolSize(String executor, String description, Integer poolSize) {
-        if (isRunning()) throw new BusinessException(409, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
+        if (isRunning())
+            handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
+                    String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
         reloadConfig();
-        if (Objects.isNull(config)) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName));
-        if (Objects.isNull(poolSize) || poolSize < 1) throw new BusinessException(400, CronjobConstant.POOL_SIZE_IS_NOT_VALID);
-        if (Objects.equals(config.getPoolSize(), poolSize)) throw new BusinessException(409, CronjobConstant.POOL_SIZE_IS_NOT_CHANGED);
-        String poolSizeDescription = "UPDATED POOL SIZE: " + config.getPoolSize() + "--> " + poolSize + ". REASON: " + description;
+        if (Objects.isNull(config))
+            handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
+                    String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName), 404);
+        if (Objects.isNull(poolSize) || poolSize < 1)
+            handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
+                    CronjobConstant.POOL_SIZE_IS_NOT_VALID, 400);
+        if (Objects.equals(config.getPoolSize(), poolSize))
+            handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
+                    CronjobConstant.POOL_SIZE_IS_NOT_CHANGED, 409);
+        String poolSizeDescription = "UPDATED POOL SIZE: " + config.getPoolSize() + "--> " + poolSize + ". REASON: "
+                + description;
         config.setPoolSize(poolSize);
         jobConfigRepository.save(config);
         jobConfigRepository.flush();
         insertJobOperationHistoryLog(executor, JobOperation.Operation.UPDATE_POOL_SIZE, poolSizeDescription);
     }
+
     public void cancel(String executor, String description) {
-        if (isRunning()) throw new BusinessException(409, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
+        if (isRunning())
+            handleFailOperation(JobOperation.Operation.CANCEL_JOB, executor, description,
+                    String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
         reloadConfig();
-        if (Objects.isNull(config)) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName));
-        if (config.getStatus().equals(BaseEntity.Status.UNSCHEDULED)) throw new BusinessException(409, String.format(CronjobConstant.CRONJOB_IS_ALREADY_UNSCHEDULED, cronjobName));
+        if (Objects.isNull(config))
+            handleFailOperation(JobOperation.Operation.CANCEL_JOB, executor, description,
+                    String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName), 404);
+        if (config.getStatus().equals(BaseEntity.Status.UNSCHEDULED))
+            handleFailOperation(JobOperation.Operation.CANCEL_JOB, executor, description,
+                    String.format(CronjobConstant.CRONJOB_IS_ALREADY_UNSCHEDULED, cronjobName), 409);
         unschedule();
         shutdownExecutorService();
         config.setStatus(BaseEntity.Status.UNSCHEDULED);
@@ -134,7 +167,9 @@ public abstract class Cronjob {
     }
 
     public void forceStart(String executor, String description) {
-        if (isRunning()) throw new BusinessException(409, String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName));
+        if (isRunning())
+            handleFailOperation(JobOperation.Operation.START_JOB_MANUALLY, executor, description,
+                    String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
         insertJobOperationHistoryLog(executor, JobOperation.Operation.START_JOB_MANUALLY, description);
         this.executor = executor;
         executeTask();
@@ -142,7 +177,9 @@ public abstract class Cronjob {
     }
 
     public void forceStop(String executor, String description) {
-        if (!isRunning()) throw new BusinessException(404, String.format(CronjobConstant.CRONJOB_IS_NOT_RUNNING, cronjobName));
+        if (!isRunning())
+            handleFailOperation(JobOperation.Operation.STOP_JOB_MANUALLY, executor, description,
+                    String.format(CronjobConstant.CRONJOB_IS_NOT_RUNNING, cronjobName), 404);
         insertJobOperationHistoryLog(executor, JobOperation.Operation.STOP_JOB_MANUALLY, description);
         jobExecutionRepository.updateStatusOfRunningJob(cronjobName, BaseEntity.Status.ABORTED);
         jobExecutionRepository.flush();
@@ -187,6 +224,7 @@ public abstract class Cronjob {
         jobExecutionRepository.save(jobExecution);
         jobExecutionRepository.flush();
     }
+
     private JobExecution getJobExecution() {
         try {
             JobExecution jobExecution = new JobExecution();
@@ -214,6 +252,17 @@ public abstract class Cronjob {
 
     private void insertJobOperationHistoryLog(String executor, JobOperation.Operation operation, String description) {
         jobOperationRepository.save(new JobOperation(cronjobName, operation, executor, description));
+    }
+
+    private void insertFailJobOperationHistoryLog(String executor, JobOperation.Operation operation, String description,
+            String errorMessage) {
+        jobOperationRepository.save(new JobOperation(cronjobName, operation, executor, description, errorMessage));
+    }
+
+    private void handleFailOperation(JobOperation.Operation operation, String executor, String description,
+            String errorMessage, int code) {
+        insertFailJobOperationHistoryLog(executor, operation, description, errorMessage);
+        throw new BusinessException(code, errorMessage);
     }
 
     public List<JobOperation> getChangeHistoryList() {

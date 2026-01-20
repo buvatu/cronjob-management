@@ -26,6 +26,9 @@ public class JobOperation {
     private Operation operation;
     private String executor;
     private String description;
+    @Enumerated(EnumType.STRING)
+    private Result result;
+    private String errorMessage;
     private Instant executedAt;
 
     public JobOperation(String jobName, Operation operation, String executor, String description) {
@@ -33,10 +36,25 @@ public class JobOperation {
         this.operation = operation;
         this.executor = executor;
         this.description = description;
+        this.result = Result.SUCCESS;
+        this.executedAt = Instant.now();
+    }
+
+    public JobOperation(String jobName, Operation operation, String executor, String description, String errorMessage) {
+        this.jobName = jobName;
+        this.operation = operation;
+        this.executor = executor;
+        this.description = description;
+        this.errorMessage = errorMessage;
+        this.result = Result.FAILURE;
         this.executedAt = Instant.now();
     }
 
     public enum Operation {
         UPDATE_POOL_SIZE, UPDATE_CRON_EXPRESSION, INITIALIZE, SCHEDULE_JOB, CANCEL_JOB, START_JOB_MANUALLY, STOP_JOB_MANUALLY, EXECUTE_JOB_ON_A_SCHEDULE
+    }
+
+    public enum Result {
+        SUCCESS, FAILURE;
     }
 }
