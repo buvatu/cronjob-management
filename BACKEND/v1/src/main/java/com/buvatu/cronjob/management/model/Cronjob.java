@@ -181,12 +181,7 @@ public abstract class Cronjob {
             handleFailOperation(JobOperation.Operation.START_JOB_MANUALLY, executor, description,
                     String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
         insertJobOperationHistoryLog(executor, JobOperation.Operation.START_JOB_MANUALLY, description);
-        JobExecution jobExecution = getJobExecution(executor);
-        if (Objects.isNull(jobExecution))
-            return;
-        jobExecutionRepository.save(jobExecution);
-        jobExecutionRepository.flush();
-        CompletableFuture.runAsync(() -> runTask(jobExecution));
+        CompletableFuture.runAsync(() -> executeTask(executor));
     }
 
     public void forceStop(String executor, String description) {
@@ -222,6 +217,7 @@ public abstract class Cronjob {
                     "Executed on a schedule");
         }
         sessionId = jobExecution.getId();
+        this.executor = jobExecution.getExecutor();
         insertTracingLog("START", 0, "Started");
         Instant startTime = Instant.now();
         try {
@@ -234,8 +230,9 @@ public abstract class Cronjob {
             finalizeJobExecution(jobExecution, JobExecution.ExitCode.FAILURE, e.getMessage(), startTime);
         } finally {
             shutdownExecutorService();
+            this.executor = null;
+            sessionId = null;
         }
-        sessionId = null;
     }
 
     private void finalizeJobExecution(JobExecution jobExecution, JobExecution.ExitCode exitCode, String output,
@@ -321,13 +318,8 @@ public abstract class Cronjob {
         return jobExecutionRepository.findByJobNameAndStatus(cronjobName, BaseEntity.Status.RUNNING).isPresent();
     }
 
-    @Scheduled(fixedRateString = "PT30S", initialDelayString = "#{new java.util.Random().nextInt(30000)}") // Reload
-                                                                                                           // every 30
-                                                                                                           // seconds -
-                                                                                                           // random
-                                                                                                           // from 0-30s
-                                                                                                           // initial
-                                                                                                           // delay
+    // Reload every 30 seconds - random from 0-30s initial delay
+    @Scheduled(fixedRateString = "PT30S", initialDelayString = "#{new java.util.Random().nextInt(30000)}")
     private void reload() {
         if (!isRunning())
             shutdownExecutorService();
