@@ -225,11 +225,12 @@ public abstract class Cronjob {
     }
 
     public List<JobExecutionLog> getTracingLogList(UUID sessionId) {
-        return jobExecutionLogRepository.findBySessionIdOrderById(sessionId);
+        return jobExecutionLogRepository.findBySessionIdOrderByCreatedAt(sessionId);
     }
 
     public Instant getLastExecutionTime() {
-        return Objects.requireNonNull(jobExecutionRepository.findFirstByJobNameOrderByCreatedAtDesc(cronjobName).orElse(null)).getCreatedAt();
+        JobExecution jobExecution = jobExecutionRepository.findFirstByJobNameOrderByCreatedAtDesc(cronjobName).orElse(null);
+        return Objects.isNull(jobExecution) ? null : jobExecution.getCreatedAt();
     }
 
     protected abstract void execute();

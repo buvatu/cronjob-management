@@ -7,7 +7,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
-@RestController @RestControllerAdvice
+@RestController
+@RestControllerAdvice
+@CrossOrigin
 public class CronjobManagementController {
 
     private final CronjobManagementService cronjobManagementService;
@@ -48,7 +50,7 @@ public class CronjobManagementController {
 
     @GetMapping("/cronjob/list")
     public ResponseEntity<?> getCronjobList() {
-        return ResponseEntity.ok(cronjobManagementService.getAllCronjobs());
+        return ResponseEntity.ok(cronjobManagementService.getAllCronjob());
     }
 
     @GetMapping("/cronjob/{cronjobName}/history/logs")

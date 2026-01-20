@@ -65,7 +65,7 @@ public class CronjobManagementService {
         return cronjob;
     }
 
-    public List<Map<String, Object>> getAllCronjobs() {
+    public List<Map<String, Object>> getAllCronjob() {
         return cronjobList.stream().map(e -> {
             Map<String, Object> map = new HashMap<>();
             map.put(CronjobConstant.CRONJOB_NAME, e.getCronjobName());

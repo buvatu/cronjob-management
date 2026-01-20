@@ -9,5 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface JobExecutionLogRepository extends JpaRepository<JobExecutionLog, UUID> {
-    List<JobExecutionLog> findBySessionIdOrderById(UUID sessionId);
+    List<JobExecutionLog> findBySessionIdOrderByCreatedAt(UUID sessionId);
 }
