@@ -5,7 +5,7 @@ import { getErrorMessage } from '../utils/errorUtils';
 import { Play, Square, CalendarClock, Ban, Save } from 'lucide-react';
 import clsx from 'clsx';
 
-export default function JobConfig({ cronjobName }) {
+export default function JobConfig({ cronjobName, onActionSuccess }) {
     const [config, setConfig] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -16,27 +16,29 @@ export default function JobConfig({ cronjobName }) {
     const [poolSize, setPoolSize] = useState('');
     const [expression, setExpression] = useState('');
     const [description, setDescription] = useState('');
+    const [version, setVersion] = useState(null);
 
     useEffect(() => {
         fetchConfig();
     }, [cronjobName]);
 
-    const fetchConfig = async () => {
+    const fetchConfig = async (silent = false) => {
         try {
-            setLoading(true);
-            const response = await cronjobService.getAllCronjobs();
-            const job = response.data.find(j => j.cronjobName === cronjobName);
+            if (!silent) setLoading(true);
+            const response = await cronjobService.getJobDetail(cronjobName);
+            const job = response.data;
             if (job) {
                 setConfig(job);
                 setPoolSize(job.poolSize);
                 setExpression(job.expression);
+                setVersion(job.version);
             } else {
                 setError('Job not found');
             }
         } catch (err) {
             setError('Failed to fetch job config');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -48,9 +50,10 @@ export default function JobConfig({ cronjobName }) {
     const handleUpdatePoolSize = async () => {
         clearMessages();
         try {
-            await cronjobService.updatePoolSize(cronjobName, parseInt(poolSize), user?.username || 'UI_USER', description);
+            await cronjobService.updatePoolSize(cronjobName, parseInt(poolSize), user?.username || 'UI_USER', description, version);
             setSuccess('Pool size updated successfully');
-            fetchConfig();
+            fetchConfig(true); // Silent refresh
+            if (onActionSuccess) onActionSuccess();
         } catch (err) {
             setError(getErrorMessage(err, 'Failed to update pool size'));
         }
@@ -59,9 +62,10 @@ export default function JobConfig({ cronjobName }) {
     const handleUpdateExpression = async () => {
         clearMessages();
         try {
-            await cronjobService.updateExpression(cronjobName, expression, user?.username || 'UI_USER', description);
+            await cronjobService.updateExpression(cronjobName, expression, user?.username || 'UI_USER', description, version);
             setSuccess('Expression updated successfully');
-            fetchConfig();
+            fetchConfig(true); // Silent refresh
+            if (onActionSuccess) onActionSuccess();
         } catch (err) {
             setError(getErrorMessage(err, 'Failed to update expression'));
         }
@@ -72,6 +76,10 @@ export default function JobConfig({ cronjobName }) {
         try {
             await actionFn(cronjobName, user?.username || 'UI_USER', description);
             setSuccess(successMsg);
+            // Refresh local state silently to update version/config without flickering
+            fetchConfig(true);
+            // Update parent (header)
+            if (onActionSuccess) onActionSuccess();
         } catch (err) {
             setError(getErrorMessage(err, 'Action failed'));
         }
@@ -82,8 +90,31 @@ export default function JobConfig({ cronjobName }) {
 
     return (
         <div className="space-y-6 max-w-2xl">
-            {error && <div className="bg-red-100 text-red-700 p-3 rounded">{error}</div>}
-            {success && <div className="bg-green-100 text-green-700 p-3 rounded">{success}</div>}
+            {error && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded shadow-sm">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <Ban className="h-5 w-5 text-red-400" aria-hidden="true" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-red-700">{error}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {success && (
+                <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded shadow-sm">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <Play className="h-5 w-5 text-green-400" aria-hidden="true" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-green-700">{success}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
                 <h3 className="text-lg font-medium mb-4">Configuration</h3>
@@ -154,7 +185,7 @@ export default function JobConfig({ cronjobName }) {
                         <Ban size={16} /> Cancel
                     </button>
                     <button
-                        onClick={() => handleAction(cronjobService.start, 'Job force started')}
+                        onClick={() => handleAction(cronjobService.start, 'Job started')}
                         className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
                     >
                         <Play size={16} /> Force Start

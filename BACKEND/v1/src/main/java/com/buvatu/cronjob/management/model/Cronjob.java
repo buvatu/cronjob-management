@@ -22,6 +22,8 @@ import lombok.NonNull;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.support.CronExpression;
@@ -74,8 +76,9 @@ public abstract class Cronjob {
             return;
         }
 
-        if (BaseEntity.Status.SCHEDULED.equals(config.getStatus()) && CronExpression.isValidExpression(config.getExpression())) {
-            future = taskScheduler.schedule(this::executeTask, new CronTrigger(config.getExpression())); // schedule in case the instance is restarted
+        if (BaseEntity.Status.SCHEDULED.equals(config.getStatus())
+                && CronExpression.isValidExpression(config.getExpression())) {
+            future = taskScheduler.schedule(() -> executeTask(null), new CronTrigger(config.getExpression()));
         }
     }
 
@@ -93,14 +96,14 @@ public abstract class Cronjob {
         if (Objects.isNull(config.getPoolSize()) || config.getPoolSize() < 1)
             handleFailOperation(JobOperation.Operation.SCHEDULE_JOB, executor, description,
                     CronjobConstant.POOL_SIZE_IS_NOT_VALID, 400);
-        future = taskScheduler.schedule(this::executeTask, new CronTrigger(config.getExpression()));
+        future = taskScheduler.schedule(() -> executeTask(null), new CronTrigger(config.getExpression()));
         config.setStatus(BaseEntity.Status.SCHEDULED);
         jobConfigRepository.save(config);
         jobConfigRepository.flush();
         insertJobOperationHistoryLog(executor, JobOperation.Operation.SCHEDULE_JOB, description);
     }
 
-    public void updateExpression(String executor, String description, @NonNull String expression) {
+    public void updateExpression(String executor, String description, @NonNull String expression, Long version) {
         if (isRunning())
             handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
                     String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
@@ -108,6 +111,9 @@ public abstract class Cronjob {
         if (Objects.isNull(config))
             handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
                     String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName), 404);
+        if (!Objects.equals(config.getVersion(), version))
+            handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
+                    CronjobConstant.VERSION_MISMATCH, 409);
         if (!CronExpression.isValidExpression(expression))
             handleFailOperation(JobOperation.Operation.UPDATE_CRON_EXPRESSION, executor, description,
                     CronjobConstant.EXPRESSION_IS_NOT_VALID, 400);
@@ -121,11 +127,12 @@ public abstract class Cronjob {
         jobConfigRepository.flush();
         insertJobOperationHistoryLog(executor, JobOperation.Operation.UPDATE_CRON_EXPRESSION, expressionDescription);
         unschedule();
-        if (!config.getStatus().equals(BaseEntity.Status.SCHEDULED)) return;
-        future = taskScheduler.schedule(this::executeTask, new CronTrigger(expression));
+        if (!config.getStatus().equals(BaseEntity.Status.SCHEDULED))
+            return;
+        future = taskScheduler.schedule(() -> executeTask(null), new CronTrigger(expression));
     }
 
-    public void updatePoolSize(String executor, String description, Integer poolSize) {
+    public void updatePoolSize(String executor, String description, Integer poolSize, Long version) {
         if (isRunning())
             handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
                     String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
@@ -133,6 +140,9 @@ public abstract class Cronjob {
         if (Objects.isNull(config))
             handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
                     String.format(CronjobConstant.CRONJOB_NOT_FOUND, cronjobName), 404);
+        if (!Objects.equals(config.getVersion(), version))
+            handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
+                    CronjobConstant.VERSION_MISMATCH, 409);
         if (Objects.isNull(poolSize) || poolSize < 1)
             handleFailOperation(JobOperation.Operation.UPDATE_POOL_SIZE, executor, description,
                     CronjobConstant.POOL_SIZE_IS_NOT_VALID, 400);
@@ -171,9 +181,12 @@ public abstract class Cronjob {
             handleFailOperation(JobOperation.Operation.START_JOB_MANUALLY, executor, description,
                     String.format(CronjobConstant.CRONJOB_IS_RUNNING, cronjobName), 409);
         insertJobOperationHistoryLog(executor, JobOperation.Operation.START_JOB_MANUALLY, description);
-        this.executor = executor;
-        executeTask();
-        this.executor = null;
+        JobExecution jobExecution = getJobExecution(executor);
+        if (Objects.isNull(jobExecution))
+            return;
+        jobExecutionRepository.save(jobExecution);
+        jobExecutionRepository.flush();
+        CompletableFuture.runAsync(() -> runTask(jobExecution));
     }
 
     public void forceStop(String executor, String description) {
@@ -186,19 +199,28 @@ public abstract class Cronjob {
         shutdownExecutorService();
     }
 
-    private void executeTask() {
+    private void executeTask(String manualExecutor) {
         // ScheduleLock
         JobExecution jobExecution;
         try {
-            jobExecution = getJobExecution();
-            if (Objects.isNull(jobExecution)) return;
+            jobExecution = getJobExecution(manualExecutor);
+            if (Objects.isNull(jobExecution))
+                return;
             jobExecutionRepository.save(jobExecution);
             jobExecutionRepository.flush();
         } catch (Exception e) {
             log.error("Another instance already executed job: {}", e.getMessage());
             return;
         }
-        if (Objects.isNull(executor)) insertJobOperationHistoryLog("SYSTEM", JobOperation.Operation.EXECUTE_JOB_ON_A_SCHEDULE, "Executed on a schedule");
+        runTask(jobExecution);
+    }
+
+    private void runTask(JobExecution jobExecution) {
+        if (Objects.isNull(jobExecution.getTriggerType())
+                || JobExecution.TriggerType.AUTO.equals(jobExecution.getTriggerType())) {
+            insertJobOperationHistoryLog("SYSTEM", JobOperation.Operation.EXECUTE_JOB_ON_A_SCHEDULE,
+                    "Executed on a schedule");
+        }
         sessionId = jobExecution.getId();
         insertTracingLog("START", 0, "Started");
         Instant startTime = Instant.now();
@@ -216,7 +238,8 @@ public abstract class Cronjob {
         sessionId = null;
     }
 
-    private void finalizeJobExecution(JobExecution jobExecution, JobExecution.ExitCode exitCode, String output, Instant startTime) {
+    private void finalizeJobExecution(JobExecution jobExecution, JobExecution.ExitCode exitCode, String output,
+            Instant startTime) {
         jobExecution.setExitCode(exitCode);
         jobExecution.setOutput(output);
         jobExecution.setDuration(Duration.between(startTime, Instant.now()));
@@ -225,16 +248,16 @@ public abstract class Cronjob {
         jobExecutionRepository.flush();
     }
 
-    private JobExecution getJobExecution() {
+    private JobExecution getJobExecution(String manualExecutor) {
         try {
             JobExecution jobExecution = new JobExecution();
             jobExecution.setJobName(cronjobName);
             jobExecution.setInstanceId(InetAddress.getLocalHost().getHostName());
-            if (Objects.isNull(executor)) {
+            if (Objects.isNull(manualExecutor)) {
                 jobExecution.setTriggerType(JobExecution.TriggerType.AUTO);
                 jobExecution.setExecutor("SYSTEM");
             } else {
-                jobExecution.setExecutor(executor);
+                jobExecution.setExecutor(manualExecutor);
                 jobExecution.setTriggerType(JobExecution.TriggerType.MANUAL);
             }
             jobExecution.setStatus(BaseEntity.Status.RUNNING);
@@ -246,7 +269,8 @@ public abstract class Cronjob {
     }
 
     public void insertTracingLog(String activityName, Integer progressValue, String description) {
-        jobExecutionLogRepository.save(new JobExecutionLog(sessionId, activityName, progressValue, description, Instant.now()));
+        jobExecutionLogRepository
+                .save(new JobExecutionLog(sessionId, activityName, progressValue, description, Instant.now()));
         jobExecutionLogRepository.flush();
     }
 
@@ -273,12 +297,21 @@ public abstract class Cronjob {
         return jobExecutionRepository.findByJobName(cronjobName);
     }
 
+    public Page<JobExecution> getPagedRunningHistory(Pageable pageable) {
+        return jobExecutionRepository.findByJobName(cronjobName, pageable);
+    }
+
+    public Page<JobOperation> getPagedChangeHistoryList(Pageable pageable) {
+        return jobOperationRepository.findByJobName(cronjobName, pageable);
+    }
+
     public List<JobExecutionLog> getTracingLogList(UUID sessionId) {
         return jobExecutionLogRepository.findBySessionIdOrderByCreatedAt(sessionId);
     }
 
     public Instant getLastExecutionTime() {
-        JobExecution jobExecution = jobExecutionRepository.findFirstByJobNameOrderByCreatedAtDesc(cronjobName).orElse(null);
+        JobExecution jobExecution = jobExecutionRepository.findFirstByJobNameOrderByCreatedAtDesc(cronjobName)
+                .orElse(null);
         return Objects.isNull(jobExecution) ? null : jobExecution.getCreatedAt();
     }
 
@@ -288,29 +321,42 @@ public abstract class Cronjob {
         return jobExecutionRepository.findByJobNameAndStatus(cronjobName, BaseEntity.Status.RUNNING).isPresent();
     }
 
-    @Scheduled(fixedRateString = "PT30S", initialDelayString = "#{new java.util.Random().nextInt(30000)}") // Reload every 30 seconds - random from 0-30s initial delay
+    @Scheduled(fixedRateString = "PT30S", initialDelayString = "#{new java.util.Random().nextInt(30000)}") // Reload
+                                                                                                           // every 30
+                                                                                                           // seconds -
+                                                                                                           // random
+                                                                                                           // from 0-30s
+                                                                                                           // initial
+                                                                                                           // delay
     private void reload() {
-        if (!isRunning()) shutdownExecutorService();
+        if (!isRunning())
+            shutdownExecutorService();
         reloadConfig();
         unschedule();
-        if (BaseEntity.Status.UNSCHEDULED.equals(config.getStatus()) || !CronExpression.isValidExpression(config.getExpression())) return;
-        future = taskScheduler.schedule(this::executeTask, new CronTrigger(config.getExpression()));
+        if (BaseEntity.Status.UNSCHEDULED.equals(config.getStatus())
+                || !CronExpression.isValidExpression(config.getExpression()))
+            return;
+        future = taskScheduler.schedule(() -> executeTask(null), new CronTrigger(config.getExpression()));
     }
 
     private void reloadConfig() {
-        JobConfig lastestConfig = jobConfigRepository.findByNameAndUpdatedAtAfter(cronjobName, config.getUpdatedAt()).orElse(null);
-        if (Objects.isNull(lastestConfig)) return;
+        JobConfig lastestConfig = jobConfigRepository.findByNameAndUpdatedAtAfter(cronjobName, config.getUpdatedAt())
+                .orElse(null);
+        if (Objects.isNull(lastestConfig))
+            return;
         config = lastestConfig;
     }
 
     private void unschedule() {
-        if (Objects.isNull(future)) return;
+        if (Objects.isNull(future))
+            return;
         future.cancel(true);
         future = null;
     }
 
     private void shutdownExecutorService() {
-        if (Objects.isNull(executorService)) return;
+        if (Objects.isNull(executorService))
+            return;
         executorService.shutdownNow();
         executorService = null;
     }

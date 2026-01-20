@@ -20,4 +20,6 @@ public class CronjobConstant {
     public static final String POOL_SIZE_IS_NOT_VALID = "Pool size is not valid";
     public static final String POOL_SIZE_IS_NOT_CHANGED = "Pool size is not changed";
 
+    public static final String VERSION = "version";
+    public static final String VERSION_MISMATCH = "Version mismatch. Please refresh and try again.";
 }

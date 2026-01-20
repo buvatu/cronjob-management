@@ -38,10 +38,10 @@ export default function Sidebar() {
                 {error && <div className="text-center text-red-400 px-2">{error}</div>}
 
                 <nav className="space-y-1 px-2">
-                    {cronjobs.map((job) => (
+                    {cronjobs.map((jobName) => (
                         <NavLink
-                            key={job.cronjobName}
-                            to={`/job/${job.cronjobName}`}
+                            key={jobName}
+                            to={`/job/${jobName}`}
                             className={({ isActive }) =>
                                 clsx(
                                     'block px-4 py-3 rounded-md transition-colors duration-200 text-sm font-medium',
@@ -51,7 +51,7 @@ export default function Sidebar() {
                                 )
                             }
                         >
-                            {job.cronjobName}
+                            {jobName}
                         </NavLink>
                     ))}
                 </nav>
